@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>供货详情</title>
+    <!-- Bootstrap 5 CSS via CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: Arial, sans-serif;
+        }
+        .content {
+            padding: 20px;
+        }
+        .detail-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .detail-item {
+            margin-bottom: 1rem;
+        }
+        .detail-label {
+            font-weight: bold;
+            min-width: 120px;
+            display: inline-block;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div class="top-bar">
+            <h1>供货详情</h1>
+            <div class="btn-group">
+                <a href="{% url 'supply:supply_update' batch_code=supply.batch_code %}" class="btn btn-warning">更新</a>
+                <a href="{% url 'supply:supply_list' %}" class="btn btn-secondary">返回列表</a>
+            </div>
+        </div>
+        
+        <div class="detail-card">
+            <div class="detail-item">
+                <div class="detail-label">批次号:</div>
+                <div>{{ supply.batch_code }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">药品名称:</div>
+                <div>{{ supply.drug_name }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">药企:</div>
+                <div>{{ supply.pharma.name }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">数量:</div>
+                <div>{{ supply.quantity }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">价格:</div>
+                <div>{{ supply.price }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">状态:</div>
+                <div>
+                    {% if supply.status == 'available' %}
+                        <span class="badge bg-success">可供应</span>
+                    {% elif supply.status == 'limited' %}
+                        <span class="badge bg-warning">限量供应</span>
+                    {% else %}
+                        <span class="badge bg-danger">不可供应</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">有效期:</div>
+                <div>{{ supply.expiry_date }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">创建时间:</div>
+                <div>{{ supply.created_at }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">更新时间:</div>
+                <div>{{ supply.updated_at }}</div>
+            </div>
+            <div class="detail-item">
+                <div class="detail-label">药品描述:</div>
+                <div>{{ supply.description }}</div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap 5 JS via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

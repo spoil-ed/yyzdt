@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-xl font-bold">{{ action }}用药记录</h2>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label class="form-label">患者姓名</label>
+        <input type="text" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">药品名称</label>
+        <input type="text" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">剂量</label>
+        <input type="text" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">服用频率</label>
+        <input type="text" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">开方医生</label>
+        <input type="text" class="form-control">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">日期</label>
+        <input type="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
+    </div>
+    
+    <button type="submit" class="btn btn-primary">{{ action }}</button>
+    <a href="{% url 'transaction:prescription_list' %}" class="btn btn-secondary">取消</a>
+</form>
+{% endblock %}

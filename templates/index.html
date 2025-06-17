@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智药医典通 - 欢迎使用</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#0FC6C2',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        success: '#00B42A',
+                        dark: '#1D2129',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .sidebar-link {
+                @apply flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-primary/10 hover:text-white transition-all duration-200;
+            }
+            .sidebar-link.active {
+                @apply bg-primary/20 text-white border-r-4 border-secondary font-medium;
+            }
+            .top-nav-item {
+                @apply relative px-4 py-3 text-gray-600 hover:text-primary transition-colors;
+            }
+            .top-nav-item.active {
+                @apply text-primary border-b-2 border-primary;
+            }
+            .welcome-card {
+                @apply bg-white rounded-xl shadow-lg p-8 transition-all duration-300 hover:shadow-xl transform hover:-translate-y-1;
+            }
+            .feature-card {
+                @apply bg-white rounded-xl shadow-md p-6 transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 - 主要模块切换 -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <!-- 移动端菜单按钮 -->
+                <div class="flex md:hidden">
+                    <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fa fa-medkit text-primary text-2xl mr-2"></i>
+                        <span class="font-bold text-xl text-primary">智药医典通</span>
+                    </div>
+                    
+                    <!-- 桌面端顶部导航 - 主要模块 -->
+                    <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item active">首页</a>
+                        <a href="#" class="top-nav-item">仪表盘</a>
+                        <a href="#" class="top-nav-item">用药管理</a>
+                        <a href="#" class="top-nav-item">库存管理</a>
+                        <a href="#" class="top-nav-item">交易管理</a>
+                        <a href="#" class="top-nav-item">供应链管理</a>
+                        <a href="#" class="top-nav-item">监管中心</a>
+                    </nav>
+                </div>
+                
+                <!-- 用户信息和操作 -->
+                <div class="flex items-center">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
+                        <i class="fa fa-bell text-xl"></i>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
+                    </button>
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
+                            </a>
+                        </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左侧边栏 - 具体功能列表 -->
+        <aside id="sidebar" class="w-64 bg-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 fixed h-full z-20 transition-transform duration-300 ease-in-out">
+            <div class="flex flex-col h-full">
+                <!-- 侧边栏头部 -->
+                <div class="p-4 border-b border-gray-700">
+                    <h2 class="text-xl font-bold text-center">功能菜单</h2>
+                </div>
+                
+                <!-- 侧边栏菜单 - 根据角色动态显示 -->
+                <nav class="flex-1 overflow-y-auto py-4">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        系统管理
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-circle"></i>
+                        <span>用户管理</span>
+                    </a>
+                    <a href="{% url 'hospital:hospital_list' %}" class="sidebar-link">
+                        <i class="fa fa-hospital-o"></i>
+                        <span>医院管理</span>
+                    </a>
+                    <a href="{% url 'supply:pharma_list' %}" class="sidebar-link">
+                        <i class="fa fa-building"></i>
+                        <span>药企管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药品管理
+                    </div>
+                    <a href="{% url 'transaction:drug_list' %}" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>药品管理</span>
+                    </a>
+                    <a href="{% url 'supply:inventory_list' %}" class="sidebar-link">
+                        <i class="fa fa-archive"></i>
+                        <span>库存管理</span>
+                    </a>
+                    <a href="{% url 'transaction:purchase_list' %}" class="sidebar-link">
+                        <i class="fa fa-shopping-cart"></i>
+                        <span>进货管理</span>
+                    </a>
+                    <a href="{% url 'transaction:sale_list' %}" class="sidebar-link">
+                        <i class="fa fa-money"></i>
+                        <span>销售管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-bar-chart"></i>
+                        <span>数据统计</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        医疗服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-stethoscope"></i>
+                        <span>患者管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <span>电子处方</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药企功能
+                    </div>
+                    <a href="{% url 'supply:pharma_drug_supply' %}" class="sidebar-link">
+                        <i class="fa fa-paper-plane"></i>
+                        <span>供货信息发布</span>
+                    </a>
+                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                        <i class="fa fa-history"></i>
+                        <span>供货记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-exchange"></i>
+                        <span>交易管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        患者服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-md"></i>
+                        <span>我的医生</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>处方查询</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        监管功能
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-eye"></i>
+                        <span>数据监控</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-pdf-o"></i>
+                        <span>审查报告</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-search"></i>
+                        <span>合规检查</span>
+                    </a>
+                </nav>
+                
+                <!-- 侧边栏底部 -->
+                <div class="p-4 border-t border-gray-700">
+                    <div class="flex items-center">
+                        <img src="https://picsum.photos/id/64/200/200" alt="用户头像" class="w-10 h-10 rounded-full object-cover">
+                        <div class="ml-3">
+                            <p class="text-sm font-medium">管理员</p>
+                            <p class="text-xs text-gray-400">系统管理员</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 遮罩层 -->
+        <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden" onclick="toggleSidebar()"></div>
+         
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto md:ml-64 p-6">
+            <div class="container mx-auto">
+                <!-- 欢迎卡片 -->
+                <div class="welcome-card mb-8">
+                    <div class="flex flex-col md:flex-row md:items-center">
+                        <div class="md:w-2/3 mb-6 md:mb-0">
+                            <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-gray-800 mb-3">欢迎使用 <span class="text-primary">智药医典通</span> 管理系统</h1>
+                            <p class="text-gray-600 text-lg mb-6">
+                                这是一个专为医疗行业设计的综合管理平台，帮助医疗机构、药企和监管部门高效管理药品流通和医疗服务。
+                            </p>
+                            <div class="flex flex-wrap gap-3">
+                                <a href="#" class="px-6 py-3 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all flex items-center">
+                                    <i class="fa fa-rocket mr-2"></i>开始使用
+                                </a>
+                                <a href="#" class="px-6 py-3 bg-white text-primary border border-primary rounded-lg shadow hover:bg-primary/5 transition-all flex items-center">
+                                    <i class="fa fa-book mr-2"></i>查看文档
+                                </a>
+                            </div>
+                        </div>
+                        <div class="md:w-1/3 flex justify-center">
+                            <img src="https://picsum.photos/id/237/400/400" alt="医疗管理系统" class="rounded-lg shadow-lg max-w-full h-auto transform transition-transform duration-500 hover:scale-105">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 系统概览 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="feature-card">
+                        <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                            <i class="fa fa-users text-primary text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">用户管理</h3>
+                        <p class="text-gray-600 mb-4">管理系统用户账户、权限和角色，支持多角色管理模式。</p>
+                        <a href="#" class="text-primary hover:text-primary/80 font-medium flex items-center">
+                            查看详情 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
+                            <i class="fa fa-medkit text-secondary text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">药品管理</h3>
+                        <p class="text-gray-600 mb-4">全面管理药品信息、库存、进货和销售，支持药品追溯和预警。</p>
+                        <a href="#" class="text-secondary hover:text-secondary/80 font-medium flex items-center">
+                            查看详情 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center mb-4">
+                            <i class="fa fa-truck text-warning text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">供应链管理</h3>
+                        <p class="text-gray-600 mb-4">优化药品供应链流程，管理供应商、订单和物流，提高效率。</p>
+                        <a href="#" class="text-warning hover:text-warning/80 font-medium flex items-center">
+                            查看详情 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="feature-card">
+                        <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mb-4">
+                            <i class="fa fa-line-chart text-success text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">数据分析</h3>
+                        <p class="text-gray-600 mb-4">提供全方位的数据统计和分析功能，支持决策和趋势预测。</p>
+                        <a href="#" class="text-success hover:text-success/80 font-medium flex items-center">
+                            查看详情 <i class="fa fa-arrow-right ml-2"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 数据统计 -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6 lg:col-span-2">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-lg font-semibold">系统数据概览</h3>
+                            <div class="flex space-x-2">
+                                <button class="px-3 py-1 text-sm bg-primary/10 text-primary rounded-full">今日</button>
+                                <button class="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">本周</button>
+                                <button class="px-3 py-1 text-sm bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200">本月</button>
+                            </div>
+                        </div>
+                        <div class="h-80">
+                            <!-- 这里应该是图表，使用示例图片代替 -->
+                            <img src="https://picsum.photos/id/180/800/400" alt="系统数据统计图表" class="w-full h-full object-cover rounded-lg">
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-6">最近活动</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <i class="fa fa-user-plus text-primary"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium">创建了新用户</p>
+                                    <p class="text-xs text-gray-500">管理员 · 2小时前</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+                                    <i class="fa fa-check-circle text-success"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium">完成了药品入库</p>
+                                    <p class="text-xs text-gray-500">张三 · 5小时前</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center">
+                                    <i class="fa fa-exclamation-triangle text-warning"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium">3种药品库存不足</p>
+                                    <p class="text-xs text-gray-500">系统 · 昨天</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                                    <i class="fa fa-file-text-o text-secondary"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium">生成了月度报告</p>
+                                    <p class="text-xs text-gray-500">李四 · 昨天</p>
+                                </div>
+                            </div>
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center">
+                                    <i class="fa fa-times-circle text-danger"></i>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium">拒绝了进货申请</p>
+                                    <p class="text-xs text-gray-500">王五 · 3天前</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 text-center">
+                            <a href="#" class="text-primary hover:text-primary/80 text-sm font-medium">查看全部活动</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 快速链接 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <h3 class="text-lg font-semibold mb-6">快速链接</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <a href="#" class="p-4 bg-gray-50 rounded-lg flex items-center hover:bg-gray-100 transition-colors">
+                            <i class="fa fa-user-plus text-primary text-xl mr-3"></i>
+                            <span>创建新用户</span>
+                        </a>
+                        <a href="#" class="p-4 bg-gray-50 rounded-lg flex items-center hover:bg-gray-100 transition-colors">
+                            <i class="fa fa-medkit text-secondary text-xl mr-3"></i>
+                            <span>添加新药品</span>
+                        </a>
+                        <a href="#" class="p-4 bg-gray-50 rounded-lg flex items-center hover:bg-gray-100 transition-colors">
+                            <i class="fa fa-shopping-cart text-warning text-xl mr-3"></i>
+                            <span>创建进货单</span>
+                        </a>
+                        <a href="#" class="p-4 bg-gray-50 rounded-lg flex items-center hover:bg-gray-100 transition-colors">
+                            <i class="fa fa-file-text-o text-success text-xl mr-3"></i>
+                            <span>生成报告</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+        
+        // 用户菜单切换
+        document.getElementById('user-menu-button').addEventListener('click', function() {
+            document.getElementById('user-menu').classList.toggle('hidden');
+        });
+        
+        // 点击页面其他区域关闭用户菜单
+        document.addEventListener('click', function(event) {
+            const userMenuButton = document.getElementById('user-menu-button');
+            const userMenu = document.getElementById('user-menu');
+            
+            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                userMenu.classList.add('hidden');
+            }
+        });
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 这里可以添加页面加载后的初始化代码
+        });
+    </script>
+</body>
+</html>

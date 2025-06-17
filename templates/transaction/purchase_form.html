@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-xl font-bold">{{ action }}进货单</h2>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label class="form-label">药品名称</label>
+        <input type="text" class="form-control" value="{{ purchase.drug_name|default:'' }}">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">供应商</label>
+        <input type="text" class="form-control" value="{{ purchase.supplier|default:'' }}">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">数量</label>
+        <input type="number" class="form-control" value="{{ purchase.quantity|default:'' }}">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">单价</label>
+        <input type="number" step="0.01" class="form-control" value="{{ purchase.price|default:'' }}">
+    </div>
+    <div class="mb-3">
+        <label class="form-label">日期</label>
+        <input type="date" class="form-control" value="{{ purchase.date|default:'' }}">
+    </div>
+    
+    <button type="submit" class="btn btn-primary">{{ action }}</button>
+    <a href="{% url 'transaction:purchase_list' %}" class="btn btn-secondary">取消</a>
+</form>
+{% endblock %}

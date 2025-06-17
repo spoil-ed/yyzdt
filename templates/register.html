@@ -1,0 +1,692 @@
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <style type="text/tailwindcss">
+            @layer utilities {
+                .content-auto {
+                    content-visibility: auto;
+                }
+                .sidebar-link {
+                    @apply flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-primary/10 hover:text-white transition-all duration-200;
+                }
+                .sidebar-link.active {
+                    @apply bg-primary/20 text-white border-r-4 border-secondary font-medium;
+                }
+                .top-nav-item {
+                    @apply relative px-4 py-3 text-gray-600 hover:text-primary transition-colors;
+                }
+                .top-nav-item.active {
+                    @apply text-primary border-b-2 border-primary;
+                }
+            }
+        </style>
+
+        <style>
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 50;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                background-color: rgba(0, 0, 0, 0.5);
+            }
+            .modal-content {
+                background-color: #fefefe;
+                margin: 15% auto;
+                padding: 20px;
+                border: 1px solid #888;
+                width: 30%;
+                border-radius: 8px;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            }
+            .close {
+                color: #aaa;
+                float: right;
+                font-size: 28px;
+                font-weight: bold;
+                cursor: pointer;
+            }
+            .close:hover {
+                color: #333;
+            }
+            .error-title {
+                color: #f53f3f;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .btn-modal {
+                margin-top: 20px;
+                text-align: center;
+            }
+            .btn-modal button {
+                padding: 8px 16px;
+                margin: 0 10px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            .btn-confirm {
+                background-color: #165DFF;
+                color: white;
+            }
+            .btn-cancel {
+                background-color: #e5e6eb;
+                color: #333;
+            }
+        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>用户注册 - 医药管理系统</title>
+        <!-- Tailwind CSS v3 -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <!-- Font Awesome -->
+        <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+        
+        <!-- Tailwind 配置 -->
+        <script>
+            tailwind.config = {
+                theme: {
+                    extend: {
+                        colors: {
+                            primary: '#165DFF',
+                            secondary: '#0FC6C2',
+                            danger: '#F53F3F',
+                        },
+                        fontFamily: {
+                            inter: ['Inter', 'system-ui', 'sans-serif'],
+                        },
+                    }
+                }
+            }
+        </script>
+        
+        <style type="text/tailwindcss">
+            @layer utilities {
+                .form-focus {
+                    @apply focus:ring-2 focus:ring-primary/50 focus:border-primary focus:outline-none;
+                }
+                .required-star {
+                    color: #F53F3F;
+                }
+                .field-hidden {
+                    display: none;
+                    pointer-events: none;
+                }
+            }
+        </style>
+    </head>
+    <body class="font-inter bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+        <!-- 顶部导航栏 -->
+        <header class="bg-white shadow-sm sticky top-0 z-30">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between h-16">
+                    <!-- Logo -->
+                    <div class="flex items-center">
+                        <i class="fa fa-medkit text-primary text-2xl mr-2"></i>
+                        <span class="font-bold text-xl text-primary">医药管理系统</span>
+                    </div>
+                    
+                    <!-- 返回链接 -->
+                    <div class="flex items-center">
+                        <a href="#" class="text-gray-600 hover:text-primary transition-colors flex items-center">
+                            <i class="fa fa-arrow-left mr-1"></i> 返回
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <main class="flex-1 flex items-center justify-center p-6">
+            <div class="container mx-auto max-w-4xl">
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="grid md:grid-cols-5">
+                        <!-- 左侧信息栏 -->
+                        <div class="md:col-span-2 bg-primary text-white p-8 flex flex-col justify-between">
+                            <div>
+                                <h2 class="text-2xl font-bold mb-4">欢迎加入医药管理系统</h2>
+                                <p class="text-white/80 mb-6">
+                                    注册账号，获取专业的医药管理服务，包括药品库存、处方管理、患者记录等功能。
+                                </p>
+                                
+                                <div class="space-y-4">
+                                    <div class="flex items-center">
+                                        <div class="bg-white/20 p-2 rounded-full mr-3">
+                                            <i class="fa fa-user-md text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium">医生用户</h3>
+                                            <p class="text-sm text-white/80">便捷管理患者和处方</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center">
+                                        <div class="bg-white/20 p-2 rounded-full mr-3">
+                                            <i class="fa fa-medkit text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium">药品管理员</h3>
+                                            <p class="text-sm text-white/80">高效管理药品库存</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center">
+                                        <div class="bg-white/20 p-2 rounded-full mr-3">
+                                            <i class="fa fa-user text-white"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="font-medium">患者用户</h3>
+                                            <p class="text-sm text-white/80">查看个人用药记录</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-8">
+                                <p class="text-sm text-white/80">
+                                    已有账号？<a href="#" class="text-white font-medium hover:underline">立即登录</a>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- 右侧表单区域 -->
+                        <div class="md:col-span-3 p-8">
+                            <div class="mb-6">
+                                <h2 class="text-2xl font-bold mb-2">创建您的账号</h2>
+                                <p class="text-gray-500">请填写以下信息完成注册</p>
+                            </div>
+                            
+                            <form id="registrationForm" method="post" enctype="multipart/form-data">
+                                {% csrf_token %}  
+                                <!-- 基本信息 -->
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold mb-4 text-gray-700">基本信息</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                用户名 <span class="required-star">*</span>
+                                            </label>
+                                            <input type="text" name="username" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                姓名 <span class="required-star">*</span>
+                                            </label>
+                                            <input type="text" name="name" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                邮箱 <span class="required-star">*</span>
+                                            </label>
+                                            <input type="email" name="email" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                联系电话
+                                            </label>
+                                            <input type="tel" name="contact" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 账户信息 -->
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold mb-4 text-gray-700">账户信息</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                密码 <span class="required-star">*</span>
+                                            </label>
+                                            <input type="password" name="password" id="password" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                            <div class="text-xs text-gray-500 mt-1">密码长度至少8位，包含字母和数字</div>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                确认密码 <span class="required-star">*</span>
+                                            </label>
+                                            <input type="password" name="confirm_password" id="confirm_password" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 角色选择 -->
+                                <div class="mb-6">
+                                    <h3 class="text-lg font-semibold mb-4 text-gray-700">角色选择</h3>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                用户角色 <span class="required-star">*</span>
+                                            </label>
+                                            <select name="role" id="role" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                <option value="">请选择角色</option>
+                                                <option value="doctor">医生</option>
+                                                <option value="drug_admin">药品管理员</option>
+                                                <option value="patient">患者</option>
+                                                <option value="system_admin">系统管理员</option>
+                                                <option value="pharma_admin">药企管理员</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <!-- 角色特定字段 - 医生 -->
+                                        <div id="doctor-fields" class="field-hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 class="font-medium text-gray-700 mb-3">医生信息</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        所属医院 <span class="required-star">*</span>
+                                                    </label>
+                                                    <select name="hospital" id="doctor-hospital" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                        {% for hospital in hospitals %}
+                                                            <option value="{{ hospital.id }}">{{ hospital.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        科室 <span class="required-star">*</span>
+                                                    </label>
+                                                    <select name="department" id="doctor-dept" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                        <option value="">请选择科室</option>
+                                                        <option value="internal">内科</option>
+                                                        <option value="surgery">外科</option>
+                                                        <option value="pediatrics">儿科</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        职称
+                                                    </label>
+                                                    <input type="text" name="title" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        医生编号
+                                                    </label>
+                                                    <input type="text" name="doctor_id" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 角色特定字段 - 药品管理员 -->
+                                        <div id="drug-admin-fields" class="field-hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 class="font-medium text-gray-700 mb-3">药品管理员信息</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        所属医院 <span class="required-star">*</span>
+                                                    </label>
+                                                    <select name="admin_hospital" id="admin-hospital" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                        {% for hospital in hospitals %}
+                                                            <option value="{{ hospital.id }}">{{ hospital.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        员工编号 <span class="required-star">*</span>
+                                                    </label>
+                                                    <input type="text" name="admin_id" id="admin-id" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- 角色特定字段 - 患者 -->
+                                        <div id="patient-fields" class="field-hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 class="font-medium text-gray-700 mb-3">患者信息</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        性别
+                                                    </label>
+                                                    <select name="gender" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                        <option value="">请选择性别</option>
+                                                        <option value="male">男</option>
+                                                        <option value="female">女</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        出生日期
+                                                    </label>
+                                                    <input type="date" name="birth_date" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        身份证号
+                                                    </label>
+                                                    <input type="text" name="id_card" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        患者编号
+                                                    </label>
+                                                    <input type="text" name="patient_id" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- 角色特定字段 - 系统管理员 -->
+                                        <div id="admin-fields" class="field-hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 class="font-medium text-gray-700 mb-3">系统管理员信息</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        管理员编号 <span class="required-star">*</span>
+                                                    </label>
+                                                    <input type="text" name="system_admin_id" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        管理权限
+                                                    </label>
+                                                    <select name="system_admin_permission" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus">
+                                                        <option value="">请选择管理权限</option>
+                                                        <option value="full">全部权限</option>
+                                                        <option value="partial">部分权限</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 角色特定字段 - 药企管理员 -->
+                                        <div id="pharma-admin-fields" class="field-hidden mt-4 bg-gray-50 p-4 rounded-lg">
+                                            <h4 class="font-medium text-gray-700 mb-3">药企管理员信息</h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        所属药企 <span class="required-star">*</span>
+                                                    </label>
+                                                    <select name="pharma" id="pharma-admin-pharma" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                        {% for pharma in pharma_list %}
+                                                            <option value="{{ pharma.id }}">{{ pharma.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                                        员工编号 <span class="required-star">*</span>
+                                                    </label>
+                                                    <input type="text" name="pharma_admin_id" id="pharma-admin-id" class="w-full px-3 py-2 border border-gray-300 rounded-md form-focus" required>
+                                                </div>
+                                            </div>
+                                        </div>  
+                                    </div>
+                                </div>
+                                
+                                <!-- 同意条款 -->
+                                <div class="mb-6">
+                                    <label class="flex items-start">
+                                        <input type="checkbox" name="agree_terms" class="mt-1 h-4 w-4 text-primary border-gray-300 rounded focus:ring-primary" required>
+                                        <span class="ml-2 text-sm text-gray-600">
+                                            我已阅读并同意<a href="#" class="text-primary hover:underline">服务条款</a>和<a href="#" class="text-primary hover:underline">隐私政策</a>
+                                        </span>
+                                    </label>
+                                </div>
+                                
+                                <!-- 表单操作按钮 -->
+                                <div class="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 pt-4 border-t border-gray-200">
+                                    <button type="button" onclick="history.back()" class="w-full sm:w-auto px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                        取消
+                                    </button>
+                                    <button type="submit" id="submitBtn" class="w-full sm:w-auto px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all flex items-center justify-center">
+                                        <i class="fa fa-user-plus mr-2"></i>
+                                        <span>创建账号</span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 底部提示 -->
+                <div class="mt-8 text-center text-gray-500 text-sm">
+                    <p>
+                        注册即表示您同意我们的<a href="#" class="text-primary hover:underline">服务条款</a>和<a href="#" class="text-primary hover:underline">隐私政策</a>
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="bg-dark text-white py-6">
+            <div class="container mx-auto px-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div>
+                        <h3 class="text-lg font-bold mb-4">医药管理系统</h3>
+                        <p class="text-gray-400 text-sm">
+                            提供全面的医药管理解决方案，                        帮助医疗机构提升管理效率，优化服务流程。
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wider mb-4">功能</h4>
+                        <ul class="space-y-2 text-sm text-gray-400">
+                            <li><a href="#" class="hover:text-white">药品管理</a></li>
+                            <li><a href="#" class="hover:text-white">库存管理</a></li>
+                            <li><a href="#" class="hover:text-white">处方管理</a></li>
+                            <li><a href="#" class="hover:text-white">患者记录</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wider mb-4">支持</h4>
+                        <ul class="space-y-2 text-sm text-gray-400">
+                            <li><a href="#" class="hover:text-white">帮助中心</a></li>
+                            <li><a href="#" class="hover:text-white">使用教程</a></li>
+                            <li><a href="#" class="hover:text-white">联系我们</a></li>
+                            <li><a href="#" class="hover:text-white">常见问题</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold uppercase tracking-wider mb-4">法律</h4>
+                        <ul class="space-y-2 text-sm text-gray-400">
+                            <li><a href="#" class="hover:text-white">隐私政策</a></li>
+                            <li><a href="#" class="hover:text-white">服务条款</a></li>
+                            <li><a href="#" class="hover:text-white">版权声明</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-8 pt-6 border-t border-gray-700 text-center text-gray-400 text-sm">
+                    <p>© 2025 医药管理系统. 保留所有权利.</p>
+                </div>
+            </div>
+        </footer>
+
+        <div id="errorModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3 class="error-title"><i class="fa fa-exclamation-circle mr-2"></i>操作失败</h3>
+                <p id="errorMessage"></p>
+                <div class="btn-modal">
+                    <button class="btn-confirm" id="confirmBtn">确定</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- JavaScript -->
+        <script>
+            // 获取DOM元素
+            const modal = document.getElementById('errorModal');
+            const closeBtn = document.querySelector('.close');
+            const confirmBtn = document.getElementById('confirmBtn');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // 从后端获取错误消息
+            const error = "{{ error|escapejs }}";
+            
+            // 显示弹窗
+            if (error) {
+                errorMessage.textContent = error;
+                modal.style.display = "block";
+            }
+            
+            // 关闭弹窗
+            closeBtn.onclick = function() {
+                modal.style.display = "none";
+            };
+            
+            confirmBtn.onclick = function() {
+                modal.style.display = "none";
+            };
+            
+            // 点击模态框外部关闭
+            window.onclick = function(event) {
+                if (event.target === modal) {
+                    modal.style.display = "none";
+                }
+            };
+            // 角色字段切换
+            function toggleRoleFields() {
+                const role = document.getElementById('role').value;
+                const allRoleFields = document.querySelectorAll('[id$="-fields"]');
+                const requiredFields = [
+                    { element: document.getElementById('doctor-hospital'), role: 'doctor' },
+                    { element: document.getElementById('doctor-dept'), role: 'doctor' },
+                    { element: document.getElementById('admin-hospital'), role: 'drug_admin' },
+                    { element: document.getElementById('admin-id'), role: 'drug_admin' },
+                    { element: document.getElementById('pharma-admin-pharma'), role: 'pharma_admin' },
+                    { element: document.getElementById('pharma-admin-id'), role: 'pharma_admin' },
+                    
+                ];
+
+                // 隐藏所有角色字段
+                allRoleFields.forEach(field => {
+                    field.classList.add('field-hidden');
+                });
+
+                // 重置所有required属性
+                requiredFields.forEach(item => {
+                    item.element.required = false;
+                    // 移除可能存在的错误样式
+                    item.element.classList.remove('border-danger');
+                });
+
+                // 根据选择显示对应字段并设置required
+                if (role === 'doctor') {
+                    document.getElementById('doctor-fields').classList.remove('field-hidden');
+                    requiredFields
+                        .filter(item => item.role === 'doctor')
+                        .forEach(item => item.element.required = true);
+                } else if (role === 'drug_admin') {
+                    document.getElementById('drug-admin-fields').classList.remove('field-hidden');
+                    requiredFields
+                        .filter(item => item.role === 'drug_admin')
+                        .forEach(item => item.element.required = true);
+                } else if (role === 'patient') {
+                    document.getElementById('patient-fields').classList.remove('field-hidden');
+                    requiredFields
+                        .filter(item => item.role === 'patient')
+                        .forEach(item => item.element.required = true);
+                } else if (role === 'system_admin') {
+                    document.getElementById('admin-fields').classList.remove('field-hidden');
+                    requiredFields
+                        .filter(item => item.role === 'system_admin')
+                        .forEach(item => item.element.required = true);
+                } else if (role === 'pharma_admin') {
+                    document.getElementById('pharma-admin-fields').classList.remove('field-hidden');
+                    requiredFields
+                        .filter(item => item.role === 'pharma_admin')
+                        .forEach(item => item.element.required = true);
+                }
+            }
+
+            // 创建账号按钮点击事件
+            document.getElementById('submitBtn').addEventListener('click', function() {
+                const form = document.getElementById('registrationForm');
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+                const submitBtn = this;
+
+                // 基本表单验证
+                if (!validateForm()) {
+                    return;
+                }
+
+                // 密码验证
+                if (password !== confirmPassword) {
+                    showError('confirm_password', '两次输入的密码不一致');
+                    document.getElementById('confirm_password').focus();
+                    return;
+                }
+
+                // 密码强度验证
+                const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
+                if (!passwordRegex.test(password)) {
+                    showError('password', '密码长度至少8位，且必须包含字母和数字');
+                    document.getElementById('password').focus();
+                    return;
+                }
+
+                // 显示加载状态
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin mr-2"></i><span>提交中...</span>';
+
+                // 这里可以添加实际的API请求逻辑
+                // 示例：模拟注册成功
+                setTimeout(() => {
+                    alert('注册成功！将跳转到登录页面');
+                    window.location.href = '#'; // 替换为实际的登录页面URL
+                }, 1500);
+            });
+
+            // 表单验证函数
+            function validateForm() {
+                const requiredFields = document.querySelectorAll('input[required], select[required]');
+                let isValid = true;
+
+                requiredFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        isValid = false;
+                        showError(field.id, '该字段为必填项');
+                    }
+                });
+
+                // 验证邮箱格式
+                const email = document.getElementById('email').value;
+                if (email && !isValidEmail(email)) {
+                    isValid = false;
+                    showError('email', '请输入有效的邮箱地址');
+                }
+
+                return isValid;
+            }
+
+            // 显示错误信息
+            function showError(fieldId, message) {
+                const field = document.getElementById(fieldId);
+                if (field) {
+                    field.classList.add('border-danger');
+                    // 3秒后移除错误样式
+                    setTimeout(() => {
+                        field.classList.remove('border-danger');
+                    }, 3000);
+                }
+                alert(message);
+            }
+
+            // 邮箱验证辅助函数
+            function isValidEmail(email) {
+                const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                return regex.test(email);
+            }
+
+            // 初始化页面
+            document.addEventListener('DOMContentLoaded', function() {
+                // 为所有input添加focus效果
+                const inputs = document.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    input.addEventListener('focus', function() {
+                        this.classList.add('ring-2', 'ring-primary/50');
+                    });
+                    input.addEventListener('blur', function() {
+                        this.classList.remove('ring-2', 'ring-primary/50');
+                    });
+                });
+
+                // 初始化角色字段
+                document.getElementById('role').addEventListener('change', toggleRoleFields);
+                toggleRoleFields(); // 初始化显示
+            });
+        </script>
+    </body>
+    </html>

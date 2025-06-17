@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-xl font-bold">销售统计</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">总销售额</h5>
+                <p class="card-text text-xl font-bold">¥{{ stats.total_sales }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">销售趋势</h5>
+                <canvas id="salesTrendChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">热销药品</h5>
+                <table class="table table-bordered table-striped">
+                    <thead>
+                        <tr>
+                            <th>药品名称</th>
+                            <th>销量</th>
+                            <th>销售额</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for drug in stats.top_drugs %}
+                        <tr>
+                            <td>{{ drug.name }}</td>
+                            <td>{{ drug.quantity }}</td>
+                            <td>{{ drug.amount }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+{% endblock %}

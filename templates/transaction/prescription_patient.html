@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-4">
+    <h2 class="text-xl font-bold">患者用药记录查询</h2>
+</div>
+
+<form method="post" class="mb-4">
+    {% csrf_token %}
+    <div class="row">
+        <div class="col-md-6">
+            <label class="form-label">患者姓名</label>
+            <input type="text" class="form-control" name="patient_name">
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+            <button type="submit" class="btn btn-primary">查询</button>
+        </div>
+    </div>
+</form>
+
+{% if prescriptions %}
+    <h3 class="mb-3">患者 {{ patient_name }} 的用药记录</h3>
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>记录编号</th>
+                <th>药品名称</th>
+                <th>剂量</th>
+                <th>服用频率</th>
+                <th>开方医生</th>
+                <th>日期</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for prescription in prescriptions %}
+            <tr>
+                <td>{{ prescription.id }}</td>
+                <td>{{ prescription.drug_name }}</td>
+                <td>{{ prescription.dosage }}</td>
+                <td>{{ prescription.frequency }}</td>
+                <td>{{ prescription.doctor }}</td>
+                <td>{{ prescription.date }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% elif request.method == 'POST' %}
+    <div class="alert alert-info">未找到该患者的用药记录</div>
+{% endif %}
+{% endblock %}

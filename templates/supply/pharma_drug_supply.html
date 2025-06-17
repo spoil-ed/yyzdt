@@ -1,0 +1,868 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智药医典通 - 管理系统</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#0FC6C2',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        success: '#00B42A',
+                        dark: '#1D2129',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .sidebar-link {
+                @apply flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-primary/10 hover:text-white transition-all duration-200;
+            }
+            .sidebar-link.active {
+                @apply bg-primary/20 text-white border-r-4 border-secondary font-medium;
+            }
+            .top-nav-item {
+                @apply relative px-4 py-3 text-gray-600 hover:text-primary transition-colors;
+            }
+            .top-nav-item.active {
+                @apply text-primary border-b-2 border-primary;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 - 主要模块切换 -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <!-- 移动端菜单按钮 -->
+                <div class="flex md:hidden">
+                    <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fa fa-medkit text-primary text-2xl mr-2"></i>
+                        <span class="font-bold text-xl text-primary">智药医典通</span>
+                    </div>
+                    
+                    <!-- 桌面端顶部导航 - 主要模块 -->
+                    <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="#" class="top-nav-item active">仪表盘</a>
+                        <a href="#" class="top-nav-item">用药管理</a>
+                        <a href="#" class="top-nav-item">库存管理</a>
+                        <a href="#" class="top-nav-item">交易管理</a>
+                        <a href="#" class="top-nav-item">供应链管理</a>
+                        <a href="#" class="top-nav-item">监管中心</a>
+                    </nav>
+                </div>
+                
+                <!-- 用户信息和操作 -->
+                <div class="flex items-center">
+                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                        <i class="fa fa-bell text-xl"></i>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
+                    </button>
+                    <div class="ml-3 relative">
+                        <div>
+                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
+                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                            </button>
+                        </div>
+                        <!-- 用户菜单 -->
+                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fa fa-user mr-2"></i>个人信息
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fa fa-cog mr-2"></i>账户设置
+                            </a>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
+                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左侧边栏 - 具体功能列表 -->
+        <aside id="sidebar" class="w-64 bg-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 fixed h-full z-20 transition-transform duration-300 ease-in-out">
+            <div class="flex flex-col h-full">
+                <!-- 侧边栏头部 -->
+                <div class="p-4 border-b border-gray-700">
+                    <h2 class="text-xl font-bold text-center">功能菜单</h2>
+                </div>
+                
+                <!-- 侧边栏菜单 - 根据角色动态显示 -->
+                <nav class="flex-1 overflow-y-auto py-4">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        系统管理
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-circle"></i>
+                        <span>用户管理</span>
+                    </a>
+                    <a href="{% url 'hospital:hospital_list' %}" class="sidebar-link">
+                        <i class="fa fa-hospital-o"></i>
+                        <span>医院管理</span>
+                    </a>
+                    <a href="{% url 'supply:pharma_list' %}" class="sidebar-link">
+                        <i class="fa fa-building"></i>
+                        <span>药企管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药品管理
+                    </div>
+                    <a href="{% url 'transaction:drug_list' %}" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>药品管理</span>
+                    </a>
+                    <a href="{% url 'supply:inventory_list' %}" class="sidebar-link">
+                        <i class="fa fa-archive"></i>
+                        <span>库存管理</span>
+                    </a>
+                    <a href="{% url 'transaction:purchase_list' %}" class="sidebar-link">
+                        <i class="fa fa-shopping-cart"></i>
+                        <span>进货管理</span>
+                    </a>
+                    <a href="{% url 'transaction:sale_list' %}" class="sidebar-link">
+                        <i class="fa fa-money"></i>
+                        <span>销售管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-bar-chart"></i>
+                        <span>数据统计</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        医疗服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-stethoscope"></i>
+                        <span>患者管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <span>电子处方</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药企功能
+                    </div>
+                    <a href="{% url 'supply:pharma_drug_supply' %}" class="sidebar-link active">
+                        <i class="fa fa-paper-plane"></i>
+                        <span>供货信息发布</span>
+                    </a>
+                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                        <i class="fa fa-history"></i>
+                        <span>供货记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-exchange"></i>
+                        <span>交易管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        患者服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-md"></i>
+                        <span>我的医生</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>处方查询</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        监管功能
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-eye"></i>
+                        <span>数据监控</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-pdf-o"></i>
+                        <span>审查报告</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-search"></i>
+                        <span>合规检查</span>
+                    </a>
+                </nav>
+                
+                <!-- 侧边栏底部 -->
+                <div class="p-4 border-t border-gray-700">
+                    <div class="flex items-center">
+                        <img src="https://picsum.photos/id/64/200/200" alt="用户头像" class="w-10 h-10 rounded-full object-cover">
+                        <div class="ml-3">
+                            <p class="text-sm font-medium">管理员</p>
+                            <p class="text-xs text-gray-400">系统管理员</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 遮罩层 -->
+        <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden" onclick="toggleSidebar()"></div>
+         
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto md:ml-64 p-6">
+            <div class="container mx-auto">
+                <!-- 页面标题和操作按钮 -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                    <div>
+                        <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-dark">药企药品供应管理</h1>
+                        <p class="text-gray-500 mt-1">管理药企与药品的供应关系，查看供应状态和资质信息</p>
+                    </div>
+                    <div class="mt-4 md:mt-0 flex gap-3">
+                        <a href="{% url 'supply:pharma_drug_supply_create' %}" class="px-4 py-2 bg-primary text-white rounded-lg flex items-center gap-2 shadow-md hover:bg-primary/90 transition-colors">
+                            <i class="fa fa-plus"></i>
+                            <span>新增供应关系</span>
+                        </a>
+                        <button class="px-4 py-2 bg-white text-gray-700 rounded-lg flex items-center gap-2 shadow-sm hover:bg-gray-50 transition-colors">
+                            <i class="fa fa-download"></i>
+                            <span>导出数据</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-xl p-5 card-shadow">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">总供应关系</p>
+                                <h3 class="text-2xl font-bold mt-1">128</h3>
+                                <p class="text-success text-sm mt-2 flex items-center">
+                                    <i class="fa fa-arrow-up mr-1"></i> 12% <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                <i class="fa fa-exchange text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-5 card-shadow">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">有效供应关系</p>
+                                <h3 class="text-2xl font-bold mt-1">112</h3>
+                                <p class="text-success text-sm mt-2 flex items-center">
+                                    <i class="fa fa-arrow-up mr-1"></i> 8% <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+                                <i class="fa fa-check-circle text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-5 card-shadow">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">主要供应商</p>
+                                <h3 class="text-2xl font-bold mt-1">36</h3>
+                                <p class="text-danger text-sm mt-2 flex items-center">
+                                    <i class="fa fa-arrow-down mr-1"></i> 2% <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                                <i class="fa fa-star text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-5 card-shadow">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">待审核供应</p>
+                                <h3 class="text-2xl font-bold mt-1">16</h3>
+                                <p class="text-gray-500 text-sm mt-2 flex items-center">
+                                    <i class="fa fa-minus mr-1"></i> 持平 <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                                <i class="fa fa-clock-o text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 搜索和筛选区域 -->
+                <div class="bg-white rounded-xl p-5 card-shadow mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">药企名称</label>
+                            <div class="relative">
+                                <i class="fa fa-building-o absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" placeholder="输入药企名称" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">药品名称</label>
+                            <div class="relative">
+                                <i class="fa fa-medkit absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" placeholder="输入药品名称" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">供应状态</label>
+                            <div class="relative">
+                                <i class="fa fa-filter absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <select class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                                    <option value="">全部状态</option>
+                                    <option value="active">有效供应</option>
+                                    <option value="expired">已过期</option>
+                                    <option value="pending">待审核</option>
+                                </select>
+                                <i class="fa fa-angle-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">是否主要供应商</label>
+                            <div class="relative">
+                                <i class="fa fa-star-o absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <select class="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                                    <option value="">全部</option>
+                                    <option value="1">是</option>
+                                    <option value="0">否</option>
+                                </select>
+                                <i class="fa fa-angle-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">供应开始日期</label>
+                            <div class="relative">
+                                <i class="fa fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="date" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">供应结束日期</label>
+                            <div class="relative">
+                                <i class="fa fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="date" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 mt-4">
+                        <button class="px-4 py-2 bg-primary text-white rounded-lg flex items-center justify-center gap-2 shadow-sm hover:bg-primary/90 transition-colors">
+                            <i class="fa fa-search"></i>
+                            <span>搜索</span>
+                        </button>
+                        <button class="px-4 py-2 bg-white text-gray-700 rounded-lg flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 transition-colors">
+                            <i class="fa fa-refresh"></i>
+                            <span>重置</span>
+                        </button>
+                        <button class="px-4 py-2 bg-white text-gray-700 rounded-lg flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 transition-colors ml-auto">
+                            <i class="fa fa-filter"></i>
+                            <span>高级筛选</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 数据表格 -->
+                <div class="bg-white rounded-xl p-5 card-shadow mb-6 overflow-hidden">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                        <h2 class="text-lg font-semibold">药企药品供应列表</h2>
+                        <div class="mt-3 md:mt-0 flex gap-2">
+                            <div class="relative">
+                                <i class="fa fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                                <input type="text" placeholder="快速搜索..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                            </div>
+                            <div class="relative">
+                                <select class="pl-4 pr-10 py-2 border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-colors">
+                                    <option value="10">10条/页</option>
+                                    <option value="20">20条/页</option>
+                                    <option value="50">50条/页</option>
+                                    <option value="100">100条/页</option>
+                                </select>
+                                <i class="fa fa-angle-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>药企名称</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>药品名称</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>药品类别</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>供应开始日期</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>供应结束日期</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>供应状态</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <div class="flex items-center gap-1">
+                                            <span>主要供应商</span>
+                                            <i class="fa fa-sort text-gray-400"></i>
+                                        </div>
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        操作
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- 数据行 1 -->
+                                <tr class="table-row-hover">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/id/28/200/200" alt="药企Logo">
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">北京同仁堂药业有限公司</div>
+                                                <div class="text-xs text-gray-500">合作中</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">感冒清热颗粒</div>
+                                        <div class="text-xs text-gray-500">12g*10袋</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            中成药
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2023-01-15
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2025-12-31
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            有效
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <i class="fa fa-check text-success"></i>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="btn-view">
+                                                <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn-edit">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn-delete">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- 数据行 2 -->
+                                <tr class="table-row-hover">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/id/29/200/200" alt="药企Logo">
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">上海医药集团股份有限公司</div>
+                                                <div class="text-xs text-gray-500">合作中</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">阿司匹林肠溶片</div>
+                                        <div class="text-xs text-gray-500">100mg*30片</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                            化学药品
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2023-03-20
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2024-09-19
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                            将过期
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <i class="fa fa-check text-success"></i>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="btn-view">
+                                                <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn-edit">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn-delete">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- 数据行 3 -->
+                                <tr class="table-row-hover">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/id/30/200/200" alt="药企Logo">
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">扬子江药业集团有限公司</div>
+                                                <div class="text-xs text-gray-500">合作中</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">蓝芩口服液</div>
+                                        <div class="text-xs text-gray-500">10ml*12支</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            中成药
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2022-11-05
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2024-11-04
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            有效
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <i class="fa fa-times text-gray-500"></i>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="btn-view">
+                                                <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn-edit">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn-delete">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- 数据行 4 -->
+                                <tr class="table-row-hover">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/id/31/200/200" alt="药企Logo">
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">辉瑞制药有限公司</div>
+                                                <div class="text-xs text-gray-500">合作中</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">布洛芬缓释胶囊</div>
+                                        <div class="text-xs text-gray-500">0.3g*20粒</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                            化学药品
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2023-05-10
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2026-05-09
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            有效
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <i class="fa fa-check text-success"></i>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="btn-view">
+                                                <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn-edit">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn-delete">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- 数据行 5 -->
+                                <tr class="table-row-hover">
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="flex-shrink-0 h-10 w-10">
+                                                <img class="h-10 w-10 rounded-full object-cover" src="https://picsum.photos/id/32/200/200" alt="药企Logo">
+                                            </div>
+                                            <div class="ml-4">
+                                                <div class="text-sm font-medium text-gray-900">云南白药集团股份有限公司</div>
+                                                <div class="text-xs text-gray-500">合作中</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">云南白药气雾剂</div>
+                                        <div class="text-xs text-gray-500">85g/瓶</div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                            中成药
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2023-02-18
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        2025-02-17
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                            有效
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                        <i class="fa fa-times text-gray-500"></i>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="btn-view">
+                                                <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn-edit">
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                            <button class="btn-delete">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- 分页 -->
+                    <div class="flex items-center justify-between px-4 py-3 sm:px-6 mt-4">
+                        <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm text-gray-700">
+                                    显示第 <span class="font-medium">1</span> 至 <span class="font-medium">5</span> 条，共 <span class="font-medium">128</span> 条结果
+                                </p>
+                            </div>
+                            <div>
+                                <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                    <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                        <span class="sr-only">上一页</span>
+                                        <i class="fa fa-chevron-left text-xs"></i>
+                                    </a>
+                                    <a href="#" aria-current="page" class="z-10 bg-primary text-white relative inline-flex items-center px-4 py-2 border border-primary text-sm font-medium">
+                                        1
+                                    </a>
+                                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                        2
+                                    </a>
+                                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                        3
+                                    </a>
+                                    <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                        ...
+                                    </span>
+                                    <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                        13
+                                    </a>
+                                    <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                        <span class="sr-only">下一页</span>
+                                        <i class="fa fa-chevron-right text-xs"></i>
+                                    </a>
+                                </nav>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 最近更新 -->
+                <div class="bg-white rounded-xl p-5 card-shadow mb-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">最近更新</h2>
+                        <a href="#" class="text-primary text-sm font-medium hover:underline">查看全部</a>
+                    </div>
+                    <div class="space-y-4">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                                <i class="fa fa-plus"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">新增了辉瑞制药有限公司的布洛芬缓释胶囊供应关系</p>
+                                <p class="text-xs text-gray-500">今天 10:24</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                                <i class="fa fa-check"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">审核通过了扬子江药业集团有限公司的蓝芩口服液供应申请</p>
+                                <p class="text-xs text-gray-500">今天 09:15</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
+                                <i class="fa fa-exclamation-triangle"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">上海医药集团股份有限公司的阿司匹林肠溶片供应关系即将到期</p>
+                                <p class="text-xs text-gray-500">昨天 16:30</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                                <i class="fa fa-trash"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-900">删除了修正药业集团股份有限公司的藿香正气水供应关系</p>
+                                <p class="text-xs text-gray-500">昨天 14:45</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // 侧边栏切换
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+        
+        // 用户菜单切换
+        document.getElementById('user-menu-button').addEventListener('click', function() {
+            document.getElementById('user-menu').classList.toggle('hidden');
+        });
+        
+        // 点击页面其他区域关闭用户菜单
+        document.addEventListener('click', function(event) {
+            const userMenuButton = document.getElementById('user-menu-button');
+            const userMenu = document.getElementById('user-menu');
+            
+            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+                userMenu.classList.add('hidden');
+            }
+        });
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 这里可以添加页面加载后的初始化代码
+        });
+    </script>
+</body>
+</html>

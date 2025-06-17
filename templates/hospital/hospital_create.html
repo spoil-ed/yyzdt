@@ -1,0 +1,390 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑医院 - 智药医典通</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#0FC6C2',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        success: '#00B42A',
+                        dark: '#1D2129',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .sidebar-link {
+                @apply flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-primary/10 hover:text-white transition-all duration-200;
+            }
+            .sidebar-link.active {
+                @apply bg-primary/20 text-white border-r-4 border-secondary font-medium;
+            }
+            .top-nav-item {
+                @apply relative px-4 py-3 text-gray-600 hover:text-primary transition-colors;
+            }
+            .top-nav-item.active {
+                @apply text-primary border-b-2 border-primary;
+            }
+            .back-button {
+                @apply inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all mr-4;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 - 主要模块切换 -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <!-- 移动端菜单按钮 -->
+                <div class="flex md:hidden">
+                    <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fa fa-medkit text-primary text-2xl mr-2"></i>
+                        <span class="font-bold text-xl text-primary">智药医典通</span>
+                    </div>
+                    
+                    <!-- 桌面端顶部导航 - 主要模块 -->
+                    <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="#" class="top-nav-item">仪表盘</a>
+                        <a href="#" class="top-nav-item">用药管理</a>
+                        <a href="#" class="top-nav-item">库存管理</a>
+                        <a href="#" class="top-nav-item">交易管理</a>
+                        <a href="#" class="top-nav-item">供应链管理</a>
+                        <a href="#" class="top-nav-item">监管中心</a>
+                    </nav>
+                </div>
+                
+                <!-- 用户信息和操作 -->
+                <div class="flex items-center">
+                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                        <i class="fa fa-bell text-xl"></i>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
+                    </button>
+                    <div class="ml-3 relative">
+                        <div>
+                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
+                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                            </button>
+                        </div>
+                        <!-- 用户菜单 -->
+                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fa fa-user mr-2"></i>个人信息
+                            </a>
+                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <i class="fa fa-cog mr-2"></i>账户设置
+                            </a>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
+                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左侧边栏 - 具体功能列表 -->
+        <aside id="sidebar" class="w-64 bg-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 fixed h-full z-20 transition-transform duration-300 ease-in-out">
+            <div class="flex flex-col h-full">
+                <!-- 侧边栏头部 -->
+                <div class="p-4 border-b border-gray-700">
+                    <h2 class="text-xl font-bold text-center">功能菜单</h2>
+                </div>
+                
+                <!-- 侧边栏菜单 - 根据角色动态显示 -->
+                <nav class="flex-1 overflow-y-auto py-4">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        系统管理
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-circle"></i>
+                        <span>用户管理</span>
+                    </a>
+                    <a href="{% url 'hospital:hospital_list' %}" class="sidebar-link active">
+                        <i class="fa fa-hospital-o"></i>
+                        <span>医院管理</span>
+                    </a>
+                    <a href="{% url 'supply:pharma_list' %}" class="sidebar-link">
+                        <i class="fa fa-building"></i>
+                        <span>药企管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药品管理
+                    </div>
+                    <a href="{% url 'transaction:drug_list' %}" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>药品管理</span>
+                    </a>
+                    <a href="{% url 'supply:inventory_list' %}" class="sidebar-link">
+                        <i class="fa fa-archive"></i>
+                        <span>库存管理</span>
+                    </a>
+                    <a href="{% url 'transaction:purchase_list' %}" class="sidebar-link">
+                        <i class="fa fa-shopping-cart"></i>
+                        <span>进货管理</span>
+                    </a>
+                    <a href="{% url 'transaction:sale_list' %}" class="sidebar-link">
+                        <i class="fa fa-money"></i>
+                        <span>销售管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-bar-chart"></i>
+                        <span>数据统计</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        医疗服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-stethoscope"></i>
+                        <span>患者管理</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <span>电子处方</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药企功能
+                    </div>
+                    <a href="{% url 'supply:pharma_drug_supply' %}" class="sidebar-link">
+                        <i class="fa fa-paper-plane"></i>
+                        <span>供货信息发布</span>
+                    </a>
+                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                        <i class="fa fa-history"></i>
+                        <span>供货记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-exchange"></i>
+                        <span>交易管理</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        患者服务
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-user-md"></i>
+                        <span>我的医生</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>用药记录</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-text-o"></i>
+                        <span>处方查询</span>
+                    </a>
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        监管功能
+                    </div>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-eye"></i>
+                        <span>数据监控</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-file-pdf-o"></i>
+                        <span>审查报告</span>
+                    </a>
+                    <a href="#" class="sidebar-link">
+                        <i class="fa fa-search"></i>
+                        <span>合规检查</span>
+                    </a>
+                </nav>
+                
+                <!-- 侧边栏底部 -->
+                <div class="p-4 border-t border-gray-700">
+                    <div class="flex items-center">
+                        <img src="https://picsum.photos/id/64/200/200" alt="用户头像" class="w-10 h-10 rounded-full object-cover">
+                        <div class="ml-3">
+                            <p class="text-sm font-medium">管理员</p>
+                            <p class="text-xs text-gray-400">系统管理员</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 遮罩层 -->
+        <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden" onclick="toggleSidebar()"></div>
+        
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto md:ml-64 p-6">
+            <div class="container mx-auto">
+                <!-- 页面内容 -->
+                <div class="flex items-center mb-6">
+                    <a href="{% url 'hospital:hospital_list' %}" class="back-button">
+                        <i class="fa fa-arrow-left mr-2"></i>返回
+                    </a>
+                    <h1 class="text-2xl font-bold">编辑医院</h1>
+                </div>
+                {% if error %}
+                    <script>
+                        alert('{{ error }}');
+                    </script>
+                {% endif %}
+                <!-- 添加医院表单 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <form method="post">
+                        {% csrf_token %}
+                        <!-- 基本信息 -->
+                        <div class="mb-8">
+                            <h2 class="text-xl font-bold mb-4">基本信息</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="hospital_name" class="block text-sm font-medium text-gray-700 mb-1">医院名称</label>
+                                    <input type="text" id="hospital_name" name="name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                </div>
+                                <div>
+                                    <label for="hospital_level" class="block text-sm font-medium text-gray-700 mb-1">医院等级</label>
+                                    <select id="hospital_level" name="grade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                        <option value="">请选择</option>
+                                        {% for grade in grades %}
+                                            <option value="{{ grade.id }}">{{ grade.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="hospital_type" class="block text-sm font-medium text-gray-700 mb-1">医院类型</label>
+                                    <select id="hospital_type" name="type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                        <option value="">请选择</option>
+                                        {% for type_obj in types %}
+                                            <option value="{{ type_obj.id }}">{{ type_obj.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="province" class="block text-sm font-medium text-gray-700 mb-1">所在城市</label>
+                                    <select id="province" name="city" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                        <option value="">请选择</option>
+                                        {% for city in cities %}
+                                            <option value="{{ city.id }}">{{ city.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="address" class="block text-sm font-medium text-gray-700 mb-1">详细地址</label>
+                                    <input type="text" id="address" name="address" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                </div>
+                                <div>
+                                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">联系电话</label>
+                                    <input type="tel" id="phone" name="contact" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                </div>
+                                <div>
+                                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">电子邮箱</label>
+                                    <input type="email" id="email" name="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 科室信息 -->
+                        <div class="mb-8">
+                            <h2 class="text-xl font-bold mb-4">科室信息</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_1" name="departments[]" value="内科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_1" class="ml-2 text-sm text-gray-700">内科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_2" name="departments[]" value="外科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_2" class="ml-2 text-sm text-gray-700">外科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_3" name="departments[]" value="妇产科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_3" class="ml-2 text-sm text-gray-700">妇产科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_4" name="departments[]" value="儿科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_4" class="ml-2 text-sm text-gray-700">儿科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_5" name="departments[]" value="眼科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_5" class="ml-2 text-sm text-gray-700">眼科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_6" name="departments[]" value="口腔科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_6" class="ml-2 text-sm text-gray-700">口腔科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_7" name="departments[]" value="皮肤科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_7" class="ml-2 text-sm text-gray-700">皮肤科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_8" name="departments[]" value="精神科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_8" class="ml-2 text-sm text-gray-700">精神科</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="department_9" name="departments[]" value="急诊科" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                    <label for="department_9" class="ml-2 text-sm text-gray-700">急诊科</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 医院简介 -->
+                        <div class="mb-8">
+                            <h2 class="text-xl font-bold mb-4">医院简介</h2>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700 mb-1">简介内容</label>
+                                <textarea id="description" name="description" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="请输入医院简介"></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- 提交按钮 -->
+                        <div class="flex justify-end space-x-4">
+                            <button type="submit" class="px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all">
+                                提交
+                            </button>
+                            <button type="button" class="px-6 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all">
+                                取消
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>

@@ -1,5 +1,6 @@
 from django.db import models
-# 交易与记录模块
+from django.utils import timezone
+from model_utils import FieldTracker
 
 class Purchase(models.Model):
     purchase_id = models.CharField(max_length=50, primary_key=True, verbose_name='采购编号')
@@ -10,7 +11,8 @@ class Purchase(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=False, verbose_name='价格')
     status = models.CharField(max_length=50, blank=True, null=True, verbose_name='状态')
     admin = models.ForeignKey('hospital.DrugAdmin', on_delete=models.CASCADE, verbose_name='药品管理员')
-    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')  # 新增创建时间字段
+    create_time = models.DateTimeField(auto_now_add=False, default=timezone.now, verbose_name='创建时间')  # 新增创建时间字段
+    tracker = FieldTracker(fields=['status'])
     
     STATUS_CHOICES = [
             ('pending', '待审核'),
@@ -41,8 +43,14 @@ class Sale(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=False, verbose_name='价格')
     status = models.CharField(max_length=50, blank=True, null=True, verbose_name='状态')
     admin = models.ForeignKey('hospital.DrugAdmin', on_delete=models.CASCADE, verbose_name='药品管理员')
-    create_time = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')  # 新增创建时间字段
-
+    create_time = models.DateTimeField(auto_now_add=False, default=timezone.now, verbose_name='创建时间')  # 新增创建时间字段
+    tracker = FieldTracker(fields=['status'])
+    STATUS_CHOICES = [
+            ('待支付', '待支付'),
+            ('已支付', '已支付'),
+            ('已取药', '已取药'),
+            ('已拒绝', '已拒绝'),
+        ]
     class Meta:
         db_table = 'sale'
         verbose_name = '销售记录'

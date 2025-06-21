@@ -1,0 +1,742 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智药医典通 - 药企供货记录</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- jsPDF and jsPDF-AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#0FC6C2',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        success: '#00B42A',
+                        dark: '#1D2129',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .sidebar-link {
+                @apply flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-primary/10 hover:text-white transition-all duration-200;
+            }
+            .sidebar-link.active {
+                @apply bg-primary/20 text-white border-r-4 border-secondary font-medium;
+            }
+            .top-nav-item {
+                @apply relative px-4 py-3 text-gray-600 hover:text-primary transition-colors;
+            }
+            .top-nav-item.active {
+                @apply text-primary border-b-2 border-primary;
+            }
+            .hover-scale {
+                @apply hover:scale-[1.02] transition-transform duration-200;
+            }
+            .status-pill {
+                @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 顶部导航栏 - 主要模块切换 -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <!-- 移动端菜单按钮 -->
+                <div class="flex md:hidden">
+                    <button type="button" id="sidebar-toggle" class="inline-flex items-center justify-center p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none">
+                        <i class="fa fa-bars text-xl"></i>
+                    </button>
+                </div>
+                
+                <!-- Logo -->
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fa fa-medkit text-primary text-2xl mr-2"></i>
+                        <span class="font-bold text-xl text-primary">智药医典通</span>
+                    </div>
+                    
+                    <!-- 桌面端顶部导航 - 主要模块 -->
+                    <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item">首页</a>
+                        <a href="#" class="top-nav-item active">仪表盘</a>
+                        <a href="#" class="top-nav-item">用药管理</a>
+                        <a href="#" class="top-nav-item">库存管理</a>
+                        <a href="#" class="top-nav-item">交易管理</a>
+                        <a href="#" class="top-nav-item">供应链管理</a>
+                        <a href="#" class="top-nav-item">监管中心</a>
+                    </nav>
+                </div>
+                
+                <!-- 用户信息和操作 -->
+                <div class="flex items-center">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
+                        <i class="fa fa-bell text-xl"></i>
+                        <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
+                    </button>
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
+                            </a>
+                        </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左侧边栏 - 具体功能列表 -->
+        <aside id="sidebar" class="w-64 bg-dark text-white shadow-lg transform -translate-x-full md:translate-x-0 fixed h-full z-20 transition-transform duration-300 ease-in-out">
+            <div class="flex flex-col h-full">
+                <!-- 侧边栏头部 -->
+                <div class="p-4 border-b border-gray-700">
+                    <h2 class="text-xl font-bold text-center">功能菜单</h2>
+                </div>
+                
+                <!-- 侧边栏菜单 - 根据角色动态显示 -->
+                <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        系统管理
+                    </div>
+                    <a href="{% url 'core:user_list' %}" class="sidebar-link">
+                        <i class="fa fa-user-circle"></i>
+                        <span>用户管理</span>
+                    </a>
+                    <a href="{% url 'hospital:hospital_list' %}" class="sidebar-link">
+                        <i class="fa fa-hospital-o"></i>
+                        <span>医院管理</span>
+                    </a>
+                    <a href="{% url 'supply:pharma_list' %}" class="sidebar-link">
+                        <i class="fa fa-building"></i>
+                        <span>药企管理</span>
+                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药品管理
+                    </div>
+                    <a href="{% url 'transaction:drug_list' %}" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>药品管理</span>
+                    </a>
+                    <a href="{% url 'supply:inventory_list' %}" class="sidebar-link">
+                        <i class="fa fa-archive"></i>
+                        <span>库存管理</span>
+                    </a>
+                    <a href="{% url 'transaction:purchase_list' %}" class="sidebar-link">
+                        <i class="fa fa-shopping-cart"></i>
+                        <span>进货管理</span>
+                    </a>
+                    <a href="{% url 'transaction:sale_list' %}" class="sidebar-link">
+                        <i class="fa fa-money"></i>
+                        <span>销售管理</span>
+                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        药企功能
+                    </div>
+                    <a href="{% url 'supply:pharma_drug_supply' %}" class="sidebar-link">
+                        <i class="fa fa-paper-plane"></i>
+                        <span>供货信息发布</span>
+                    </a>
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link active">
+                        <i class="fa fa-history"></i>
+                        <span>供货记录</span>
+                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
+                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                        患者服务
+                    </div>
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
+                        <i class="fa fa-medkit"></i>
+                        <span>用药记录</span>
+                    </a>
+                    {% endif %}
+                </nav>
+                
+                <!-- 侧边栏底部 -->
+                <div class="p-4 border-t border-gray-700">
+                    <div class="flex items-center">
+                        <img src="https://picsum.photos/id/64/200/200" alt="用户头像" class="w-10 h-10 rounded-full object-cover">
+                        <div class="ml-3">
+                            <p class="text-sm font-medium">管理员</p>
+                            <p class="text-xs text-gray-400">系统管理员</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 遮罩层 -->
+        <div id="sidebar-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-10 hidden md:hidden" onclick="toggleSidebar()"></div>
+         
+        <!-- 主内容区域 -->
+        <main class="flex-1 overflow-y-auto md:ml-64 p-6">
+            <div class="container mx-auto">
+                <!-- 页面标题 -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+                    <div>
+                        <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-gray-800">药企供货记录</h1>
+                        <p class="text-gray-500 mt-1">管理药企供货记录</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button class="btn-refresh flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                            <i class="fa fa-refresh mr-2"></i>刷新
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 筛选区域 - 重构为后端筛选 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <h3 class="text-lg font-semibold mb-4">筛选条件</h3>
+                    <form id="filter-form" action="{% url 'transaction:supply_records' %}" method="GET">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">医院</label>
+                                <select name="hospital" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部医院</option>
+                                    {% for hospital in hospitals %}
+                                    <option value="{{ hospital.id }}" {% if request.GET.hospital == hospital.id|stringformat:"s" %}selected{% endif %}>{{ hospital.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">采购编号</label>
+                                <input type="text" name="purchase_id" value="{{ request.GET.purchase_id }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">药品名称</label>
+                                <input type="text" name="drug_name" value="{{ request.GET.drug_name }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                                <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部状态</option>
+                                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>待审核</option>
+                                    <option value="approved" {% if request.GET.status == 'approved' %}selected{% endif %}>已审核</option>
+                                    <option value="received" {% if request.GET.status == 'received' %}selected{% endif %}>已入库</option>
+                                    <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>已拒绝</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
+                                <select name="ordering" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="-create_time" {% if request.GET.ordering == '-create_time' %}selected{% endif %}>最新创建</option>
+                                    <option value="create_time" {% if request.GET.ordering == 'create_time' %}selected{% endif %}>最早创建</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">供货日期范围</label>
+                            <div class="flex space-x-3">
+                                <input type="date" name="start_date" value="{{ request.GET.start_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                <input type="date" name="end_date" value="{{ request.GET.end_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-3">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
+                                <i class="fa fa-filter mr-2"></i>筛选
+                            </button>
+                            <button type="reset" id="reset-filters" class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                重置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- 供货统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">本月供货单</p>
+                                <h3 class="text-3xl font-bold mt-1">{{ supply_count }}</h3>
+                                <p class="text-{{ supply_count_growth|yesno:'success,danger' }} text-sm mt-2 flex items-center">
+                                    <i class="fa fa-{{ supply_count_growth|yesno:'arrow-up,arrow-down' }} mr-1"></i> 
+                                    {{ supply_count_growth }}% <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                <i class="fa fa-file-text-o text-primary text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">本月供货金额</p>
+                                <h3 class="text-3xl font-bold mt-1">¥{{ this_month_amount }}</h3>
+                                <p class="text-{{ amount_growth|yesno:'success,danger' }} text-sm mt-2 flex items-center">
+                                    <i class="fa fa-{{ amount_growth|yesno:'arrow-up,arrow-down' }} mr-1"></i> 
+                                    {{ amount_growth }}% <span class="text-gray-500 ml-1">较上月</span>
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center">
+                                <i class="fa fa-money text-success text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">待审核订单</p>
+                                <h3 class="text-3xl font-bold mt-1">{{ pending_orders }}</h3>
+                                <p class="text-warning text-sm mt-2 flex items-center">
+                                    <i class="fa fa-exclamation-circle mr-1"></i> 需要处理
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-warning/10 flex items-center justify-center">
+                                <i class="fa fa-clock-o text-warning text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">合作医院数量</p>
+                                <h3 class="text-3xl font-bold mt-1">{{ total_hospitals }}</h3>
+                                <p class="text-gray-500 text-sm mt-2">
+                                    本月新增 {{ new_hospitals_this_month }} 家
+                                </p>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center">
+                                <i class="fa fa-hospital-o text-secondary text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 供货月度趋势图表 - 并列显示 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">供货月度趋势</h3>
+                        <div class="chart-container">
+                            <canvas id="suppliesMonthlyTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">按医院的金额分布</h3>
+                        <div class="chart-container">
+                            <canvas id="suppliesByHospitalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 供货记录列表 -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+                    <div class="p-6">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+                            <h3 class="text-xl font-bold">供货记录列表</h3>
+                            <div class="flex space-x-3">
+                                <div class="relative">
+                                    <input type="text" placeholder="搜索供货记录..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                                <button class="btn-export flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                    <i class="fa fa-download mr-2"></i>导出
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">采购编号</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">医院名称</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">药品名称</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总价</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    {% for supply in supplies %}
+                                    <tr class="table-row-hover">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <a href="#" class="text-primary hover:underline">{{ supply.purchase_id }}</a>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.hospital.name }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.drug.name }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.price }} 
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.quantity }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.total_amount }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            {% if supply.status == '待审核' %}
+                                            <span class="status-pill bg-yellow-100 text-yellow-800">待审核</span>
+                                            {% elif supply.status == '已审核' %}
+                                            <span class="status-pill bg-green-100 text-green-800">已审核</span>
+                                            {% elif supply.status == '已入库' %}
+                                            <span class="status-pill bg-blue-100 text-blue-800">已入库</span>
+                                            {% elif supply.status == '已拒绝' %}
+                                            <span class="status-pill bg-red-100 text-red-800">已拒绝</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ supply.create_time|date:"Y-m-d" }}
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr>
+                                        <td colspan="9" class="px-6 py-16 text-center text-gray-500">
+                                            <div class="flex flex-col items-center">
+                                                <i class="fa fa-file-text-o text-4xl mb-3 text-gray-300"></i>
+                                                <p class="text-lg">暂无供货记录</p>
+                                                <p class="text-sm mt-1">尝试调整筛选条件</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- 分页 -->
+                        <div class="mt-6 flex justify-between items-center">
+                            <div class="text-sm text-gray-700">
+                                显示 {{ supplies.start_index }} 到 {{ supplies.end_index }} 条，共 {{ supplies.paginator.count }} 条记录
+                            </div>
+                            <div class="flex space-x-1">
+                                {% if supplies.has_previous %}
+                                <a href="?page={{ supplies.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50">
+                                    <i class="fa fa-angle-left"></i>
+                                </a>
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-left"></i>
+                                </span>
+                                {% endif %}
+                                {% for num in supplies.paginator.page_range %}
+                                {% if supplies.number == num %}
+                                <span class="px-3 py-1 border border-primary bg-primary text-white rounded-md">{{ num }}</span>
+                                {% elif num > supplies.number|add:'-3' and num < supplies.number|add:'3' %}
+                                <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{{ num }}</a>
+                                {% endif %}
+                                {% endfor %}
+                                {% if supplies.has_next %}
+                                <a href="?page={{ supplies.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50">
+                                    <i class="fa fa-angle-right"></i>
+                                </a>
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-right"></i>
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+
+        document.getElementById('sidebar-toggle').addEventListener('click', toggleSidebar);
+        document.getElementById('user-menu-button').addEventListener('click', function() {
+            const userMenu = document.getElementById('user-menu');
+            userMenu.classList.toggle('hidden');
+        });
+
+        document.getElementById('reset-filters').addEventListener('click', function() {
+            const form = document.getElementById('filter-form');
+            form.reset();
+            form.submit();
+        });
+    </script>
+    <script>
+        // 供货月度趋势图
+        const suppliesMonthlyTrendCtx = document.getElementById('suppliesMonthlyTrendChart').getContext('2d');
+        
+        // 从模板上下文中获取数据
+        const months = [{% for item in monthly_supplies %}"{{ item.month|date:"Y年m月" }}",{% endfor %}];
+        const amounts = [{% for item in monthly_supplies %}{{ item.amount|floatformat:2 }},{% endfor %}];
+        
+        new Chart(suppliesMonthlyTrendCtx, {
+            type: 'line',
+            data: {
+                labels: months,
+                datasets: [{
+                    label: '供货金额 (¥)',
+                    data: amounts,
+                    borderColor: 'rgba(22, 93, 255, 1)', // 主色调蓝色
+                    backgroundColor: 'rgba(22, 93, 255, 0.1)', // 半透明蓝色背景
+                    fill: true,
+                    tension: 0.4, // 曲线平滑度
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: 'rgba(22, 93, 255, 1)',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#1D2129',
+                        bodyColor: '#1D2129',
+                        borderColor: 'rgba(200, 200, 200, 0.5)',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function(context) {
+                                return `金额: ¥${context.parsed.y.toLocaleString()}`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 6
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(230, 230, 230, 1)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '¥' + value.toLocaleString();
+                            },
+                            padding: 10
+                        },
+                        title: {
+                            display: true,
+                            text: '金额 (¥)',
+                            color: '#666',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            padding: 10,
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        title: {
+                            display: true,
+                            text: '月份',
+                            color: '#666',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+    <script>
+        // 按医院的金额分布柱状图
+        const suppliesByHospitalCtx = document.getElementById('suppliesByHospitalChart').getContext('2d');
+        
+        // 从模板上下文中获取数据
+        const hospitalNames = [{% for hospital in supplies_by_hospital %}"{{ hospital.hospital__name }}",{% endfor %}];
+        const hospitalAmounts = [{% for hospital in supplies_by_hospital %}{{ hospital.amount|floatformat:2 }},{% endfor %}];
+        
+        new Chart(suppliesByHospitalCtx, {
+            type: 'bar',
+            data: {
+                labels: hospitalNames,
+                datasets: [{
+                    label: '供货金额 (¥)',
+                    data: hospitalAmounts,
+                    backgroundColor: [
+                        'rgba(15, 198, 194, 0.7)',  // 次要色青蓝色
+                        'rgba(22, 93, 255, 0.7)',   // 主色调蓝色
+                        'rgba(0, 180, 42, 0.7)',    // 成功色绿色
+                        'rgba(255, 125, 0, 0.7)',   // 警告色橙色
+                        'rgba(245, 63, 63, 0.7)',   // 危险色红色
+                        'rgba(102, 102, 102, 0.7)'  // 灰色
+                    ],
+                    borderColor: [
+                        'rgba(15, 198, 194, 1)',
+                        'rgba(22, 93, 255, 1)',
+                        'rgba(0, 180, 42, 1)',
+                        'rgba(255, 125, 0, 1)',
+                        'rgba(245, 63, 63, 1)',
+                        'rgba(102, 102, 102, 1)'
+                    ],
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.6,
+                    categoryPercentage: 0.7
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        titleColor: '#1D2129',
+                        bodyColor: '#1D2129',
+                        borderColor: 'rgba(200, 200, 200, 0.5)',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function(context) {
+                                return `金额: ¥${context.parsed.y.toLocaleString()}`;
+                            }
+                        }
+                    },
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(230, 230, 230, 1)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '¥' + value.toLocaleString();
+                            },
+                            padding: 10
+                        },
+                        title: {
+                            display: true,
+                            text: '金额 (¥)',
+                            color: '#666',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            padding: 10,
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        title: {
+                            display: true,
+                            text: '医院名称',
+                            color: '#666',
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

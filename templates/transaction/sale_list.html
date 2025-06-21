@@ -9,6 +9,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- jsPDF and jsPDF-AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     
     <!-- Tailwind 配置 -->
     <script>
@@ -48,6 +53,12 @@
             .top-nav-item.active {
                 @apply text-primary border-b-2 border-primary;
             }
+            .hover-scale {
+                @apply hover:scale-[1.02] transition-transform duration-200;
+            }
+            .status-pill {
+                @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+            }
         }
     </style>
 </head>
@@ -72,6 +83,7 @@
                     
                     <!-- 桌面端顶部导航 - 主要模块 -->
                     <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item">首页</a>
                         <a href="#" class="top-nav-item active">仪表盘</a>
                         <a href="#" class="top-nav-item">用药管理</a>
                         <a href="#" class="top-nav-item">库存管理</a>
@@ -83,31 +95,47 @@
                 
                 <!-- 用户信息和操作 -->
                 <div class="flex items-center">
-                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
                         <i class="fa fa-bell text-xl"></i>
                         <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
                     </button>
-                    <div class="ml-3 relative">
-                        <div>
-                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
-                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
-                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
-                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
-                            </button>
-                        </div>
-                        <!-- 用户菜单 -->
-                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-user mr-2"></i>个人信息
-                            </a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-cog mr-2"></i>账户设置
-                            </a>
-                            <div class="border-t border-gray-100 my-1"></div>
-                            <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
-                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
                             </a>
                         </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -125,10 +153,11 @@
                 
                 <!-- 侧边栏菜单 - 根据角色动态显示 -->
                 <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
                     <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         系统管理
                     </div>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'core:user_list' %}" class="sidebar-link">
                         <i class="fa fa-user-circle"></i>
                         <span>用户管理</span>
                     </a>
@@ -140,6 +169,8 @@
                         <i class="fa fa-building"></i>
                         <span>药企管理</span>
                     </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药品管理
                     </div>
@@ -159,24 +190,8 @@
                         <i class="fa fa-money"></i>
                         <span>销售管理</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-bar-chart"></i>
-                        <span>数据统计</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        医疗服务
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-stethoscope"></i>
-                        <span>患者管理</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <span>电子处方</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>用药记录</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药企功能
                     </div>
@@ -184,44 +199,20 @@
                         <i class="fa fa-paper-plane"></i>
                         <span>供货信息发布</span>
                     </a>
-                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link">
                         <i class="fa fa-history"></i>
                         <span>供货记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-exchange"></i>
-                        <span>交易管理</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         患者服务
                     </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-user-md"></i>
-                        <span>我的医生</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
                         <i class="fa fa-medkit"></i>
                         <span>用药记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>处方查询</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        监管功能
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-eye"></i>
-                        <span>数据监控</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <span>审查报告</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-search"></i>
-                        <span>合规检查</span>
-                    </a>
+                    {% endif %}
                 </nav>
                 
                 <!-- 侧边栏底部 -->
@@ -243,9 +234,80 @@
         <!-- 主内容区域 -->
         <main class="flex-1 overflow-y-auto md:ml-64 p-6">
             <div class="container mx-auto">
-                <!-- 页面内容 -->
-                <h1 class="text-2xl font-bold mb-6">销售管理仪表盘</h1>
+                <!-- 页面标题 -->
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+                    <div>
+                        <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-gray-800">销售管理</h1>
+                        <p class="text-gray-500 mt-1">管理药品销售记录和流程</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <a href="{% url 'transaction:sale_create' %}" class="btn-primary flex items-center px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all hover-scale">
+                            <i class="fa fa-plus mr-2"></i>创建销售单
+                        </a>
+                        <button class="btn-refresh flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                            <i class="fa fa-refresh mr-2"></i>刷新
+                        </button>
+                    </div>
+                </div>
                 
+                <!-- 筛选区域 - 重构为后端筛选 -->
+                <!-- 筛选区域 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
+                    <h3 class="text-lg font-semibold mb-4">筛选条件</h3>
+                    <form id="filter-form" action="{% url 'transaction:sale_list' %}" method="GET">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">医院</label>
+                                <select name="hospital" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部医院</option>
+                                    {% for hospital in hospitals %}
+                                    <option value="{{ hospital.id }}" {% if request.GET.hospital == hospital.id|stringformat:"i" %}selected{% endif %}>{{ hospital.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">销售单号</label>
+                                <input type="text" name="sale_id" value="{{ request.GET.sale_id }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">药品名称</label>
+                                <input type="text" name="drug_name" value="{{ request.GET.drug_name }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                                <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部状态</option>
+                                    <option value="待审核" {% if request.GET.status == '待审核' %}selected{% endif %}>待审核</option>
+                                    <option value="已审核" {% if request.GET.status == '已审核' %}selected{% endif %}>已审核</option>
+                                    <option value="已完成" {% if request.GET.status == '已完成' %}selected{% endif %}>已完成</option>
+                                    <option value="已取消" {% if request.GET.status == '已取消' %}selected{% endif %}>已取消</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">日期范围</label>
+                                <div class="flex space-x-3">
+                                    <input type="date" name="start_date" value="{{ request.GET.start_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <input type="date" name="end_date" value="{{ request.GET.end_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">排序</label>
+                                <select name="ordering" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="-create_time" {% if request.GET.ordering == '-create_time' %}selected{% endif %}>最新创建</option>
+                                    <option value="create_time" {% if request.GET.ordering == 'create_time' %}selected{% endif %}>最早创建</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-3">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
+                                <i class="fa fa-filter mr-2"></i>筛选
+                            </button>
+                            <button type="button" id="reset-filters" class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                重置
+                            </button>
+                        </div>
+                    </form>
+                </div>
                 <!-- 数据卡片 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <div class="bg-white rounded-xl shadow-sm p-6">
@@ -315,32 +377,56 @@
                     </div>
                 </div>
                 
-                <!-- 销售列表 -->
-                <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
-                        <h2 class="text-xl font-bold">销售列表</h2>
-                        <div class="flex space-x-3">
-                            <a href="{% url 'transaction:sale_create' %}" class="btn btn-primary flex items-center px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all">
-                                <i class="fa fa-plus mr-2"></i>添加销售记录
-                            </a>
-                            <button class="btn btn-outline flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
-                                <i class="fa fa-download mr-2"></i>导出报表
-                            </button>
+                <!-- 销售月度趋势图表 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">销售月度趋势</h3>
+                        <div class="chart-container">
+                            <canvas id="salesMonthlyTrendChart"></canvas>
                         </div>
                     </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">按医院的金额分布</h3>
+                        <div class="chart-container">
+                            <canvas id="salesByHospitalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 销售列表 -->
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+                    <div class="p-6">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+                            <h3 class="text-xl font-bold">销售列表</h3>
+                            <div class="flex space-x-3">
+                                <div class="relative">
+                                    <input type="text" placeholder="搜索销售单..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                                </div>
+                                <a href="{% url 'transaction:sale_create' %}" class="btn-primary flex items-center px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all">
+                                    <i class="fa fa-plus mr-2"></i>添加销售记录
+                                </a>
+                                <button id="export-pdf" class="btn-export flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                    <i class="fa fa-download mr-2"></i>导出报表
+                                </button>
+                            </div>
+                        </div>
+                        
                     
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table id="sale-table" class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">销售单号</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">医院名称</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">药品名称</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">规格</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">销售数量</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">销售单价</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">销售总价</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">销售日期</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">客户姓名</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">总价</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">日期</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">患者</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                                     <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                 </tr>
                             </thead>
@@ -350,6 +436,7 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                         <a href="#" class="text-primary hover:underline">{{ sale.sale_id }}</a>
                                     </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sale.hospital.name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ sale.drug.name }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sale.drug.spec }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sale.quantity }}</td>
@@ -357,14 +444,66 @@
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{{ sale.total_amount }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sale.create_time|date:"Y-m-d" }}</td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ sale.patient }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        {% if sale.status == '待支付' %}
+                                        <span class="status-pill bg-yellow-100 text-yellow-800">待支付</span>
+                                        {% elif sale.status == '已支付' %}
+                                        <span class="status-pill bg-green-100 text-green-800">已支付</span>
+                                        {% elif sale.status == '已取药' %}
+                                        <span class="status-pill bg-blue-100 text-blue-800">已取药</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <a href="#" class="text-primary hover:text-primary/80 mr-3">查看</a>
-                                        <a href="#" class="text-warning hover:text-warning/80">编辑</a>
+                                        {% if sale.status == '待支付' %}
+                                        <a href="#" class="bg-primary text-white px-3 py-1 rounded-md mr-2 pay-btn" data-sale-id="{{ sale.sale_id }}">支付</a>
+                                        {% endif %}
+                                        {% if sale.status == '已支付' %}
+                                        <a href="#" class="bg-success text-white px-3 py-1 rounded-md take-drug-btn" data-sale-id="{{ sale.sale_id }}">取药</a>
+                                        {% endif %}
+                                        <!-- 添加删除按钮 -->
+                                        <a href="#" class="delete-btn bg-danger text-white px-3 py-1 rounded-md" data-sale-id="{{ sale.sale_id }}">删除</a>
                                     </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- 分页 -->
+                    <div class="mt-6 flex justify-between items-center">
+                        <div class="text-sm text-gray-700">
+                            显示 {{ sales.start_index }} 到 {{ sales.end_index }} 条，共 {{ sales.paginator.count }} 条记录
+                        </div>
+                        <div class="flex space-x-1">
+                            {% if sales.has_previous %}
+                            <a href="?page={{ sales.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                            {% else %}
+                            <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                <i class="fa fa-angle-left"></i>
+                            </span>
+                            {% endif %}
+                            
+                            {% for num in sales.paginator.page_range %}
+                            {% if sales.number == num %}
+                            <span class="px-3 py-1 border border-primary bg-primary text-white rounded-md">{{ num }}</span>
+                            {% elif num > sales.number|add:'-3' and num < sales.number|add:'3' %}
+                            <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{{ num }}</a>
+                            {% endif %}
+                            {% endfor %}
+                            
+                            {% if sales.has_next %}
+                            <a href="?page={{ sales.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                            {% else %}
+                            <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                <i class="fa fa-angle-right"></i>
+                            </span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -373,6 +512,106 @@
 
     <!-- JavaScript -->
     <script>
+        document.querySelectorAll('.pay-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const saleId = this.getAttribute('data-sale-id');
+            if (confirm('确定要支付此销售单吗？')) {
+                fetch("{% url 'transaction:pay_sale' 'placeholder' %}".replace('placeholder', saleId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+               .then(response => response.json())
+               .then(data => {
+                    if (data.success) {
+                        alert('支付成功！');
+                        location.reload(); // 刷新页面以更新状态
+                    } else {
+                        alert('支付失败：' + data.error);
+                    }
+                })
+               .catch(error => {
+                    alert('请求失败：' + error);
+                });
+            }
+        });
+    });
+
+    document.querySelectorAll('.take-drug-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const saleId = this.getAttribute('data-sale-id');
+            if (confirm('确定要取药吗？')) {
+                fetch("{% url 'transaction:take_drug' 'placeholder' %}".replace('placeholder', saleId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+               .then(response => response.json())
+               .then(data => {
+                    if (data.success) {
+                        alert('取药成功！');
+                        location.reload(); // 刷新页面以更新状态
+                    } else {
+                        alert('取药失败：' + data.error);
+                    }
+                })
+               .catch(error => {
+                    alert('取药成功。。' + error);
+                });
+            }
+        });
+    });
+    ///删除
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteButtons = document.querySelectorAll('.delete-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                const saleId = this.dataset.saleId;
+                if (confirm('确定要删除这个进货单吗？')) {
+                    // 发送删除请求到后端
+                    fetch(`{% url 'transaction:sale_delete' %}?sale_id=${saleId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                   .then(response => response.json())
+                   .then(data => {
+                        if (data.success) {
+                            alert('进货单删除成功');
+                            // 刷新页面
+                            window.location.reload();
+                        } else {
+                            alert(`操作失败：${data.error}`);
+                        }
+                    })
+                   .catch(error => {
+                        alert('请求出错：' + error.message);
+                    });
+                }
+            });
+        });
+    });
+    // 重置筛选按钮
+    document.getElementById('reset-filters').addEventListener('click', function() {
+        // 重置表单字段
+        document.getElementById('filter-form').reset();
+        
+        // 获取当前URL的基本部分（不包含查询参数）
+        const baseUrl = window.location.origin + window.location.pathname;
+        
+        // 使用基本URL重新加载页面，不带任何查询参数
+        window.location.href = baseUrl;
+    });
         // 侧边栏切换
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -399,6 +638,170 @@
         
         // 移动端点击遮罩层关闭侧边栏
         document.getElementById('sidebar-backdrop').addEventListener('click', toggleSidebar);
+        
+        // 重置筛选按钮
+        document.getElementById('reset-filters').addEventListener('click', function() {
+            // 重置表单字段
+            document.getElementById('filter-form').reset();
+            
+            // 获取当前URL的基本部分（不包含查询参数）
+            const baseUrl = window.location.origin + window.location.pathname;
+            
+            // 使用基本URL重新加载页面，不带任何查询参数
+            window.location.href = baseUrl;
+        });
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 为表格行添加悬停效果
+            document.querySelectorAll('tbody tr').forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.classList.add('bg-gray-50');
+                });
+                row.addEventListener('mouseleave', function() {
+                    this.classList.remove('bg-gray-50');
+                });
+            });
+
+            // 导出PDF功能
+            document.getElementById('export-pdf').addEventListener('click', function() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('landscape'); // 使用横向布局以适应宽表格
+
+                // 添加标题
+                doc.setFontSize(16);
+                doc.text('销售管理报表', 14, 15);
+                doc.setFontSize(10);
+                doc.text(`生成日期: ${new Date().toLocaleDateString('zh-CN')}`, 14, 22);
+
+                // 表格数据
+                const table = document.getElementById('sale-table');
+                const headers = [
+                    '销售单号', '医院名称', '药品名称', '规格', '数量', '单价', '总价', '日期', '患者', '状态'
+                ];
+                const data = [];
+
+                // 收集表格数据（仅当前页面）
+                table.querySelectorAll('tbody tr').forEach(row => {
+                    const rowData = [];
+                    row.querySelectorAll('td').forEach((cell, index) => {
+                        if (index < 9) { // 排除“操作”列
+                            if (index === 0) {
+                                // 销售单号，去除超链接
+                                rowData.push(cell.querySelector('a').textContent);
+                            } else {
+                                rowData.push(cell.textContent.trim());
+                            }
+                        }
+                    });
+                    data.push(rowData);
+                });
+
+                // 使用autoTable生成表格
+                doc.autoTable({
+                    head: [headers],
+                    body: data,
+                    startY: 30,
+                    styles: {
+                        font: 'Helvetica', // 默认字体
+                        fontSize: 8,
+                        cellPadding: 2,
+                    },
+                    headStyles: {
+                        fillColor: [22, 93, 255], // 对应 primary 颜色
+                        textColor: [255, 255, 255],
+                        fontStyle: 'bold',
+                    },
+                    theme: 'striped',
+                    margin: { top: 30, left: 14, right: 14 },
+                });
+
+                // 保存PDF
+                doc.save(`销售管理报表_${new Date().toLocaleDateString('zh-CN').replace(/\//g, '-')}.pdf`);
+            });
+        });
+    </script>
+    <script>
+        // 销售月度趋势图
+        const salesMonthlyTrendCtx = document.getElementById('salesMonthlyTrendChart').getContext('2d');
+        new Chart(salesMonthlyTrendCtx, {
+            type: 'line',
+            data: {
+                labels: [{% for item in monthly_sales %}"{{ item.month|date:"Y年m月" }}",{% endfor %}],
+                datasets: [{
+                    label: '销售金额 (¥)',
+                    data: [{% for item in monthly_sales %}{{ item.amount|floatformat:2 }},{% endfor %}],
+                    borderColor: 'rgba(255, 159, 64, 1)', // 橙色线条
+                    backgroundColor: 'rgba(255, 159, 64, 0.1)', // 半透明橙色背景
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '金额 (¥)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
+
+        // 按医院的金额分布柱状图
+        const salesByHospitalCtx = document.getElementById('salesByHospitalChart').getContext('2d');
+        new Chart(salesByHospitalCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for hospital in sales_by_hospital %}"{{ hospital.hospital__name }}",{% endfor %}],
+                datasets: [{
+                    label: '销售金额 (¥)',
+                    data: [{% for hospital in sales_by_hospital %}{{ hospital.amount|floatformat:2 }},{% endfor %}],
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)', // 粉色柱状图
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '金额 (¥)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '医院名称'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>

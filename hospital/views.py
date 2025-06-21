@@ -2,11 +2,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.http import HttpResponse
 from django.contrib import messages
-from .models import Hospital, HospitalType, HospitalGrade, City, Doctor
-from .forms import HospitalForm
+from .models import Hospital #, HospitalType, HospitalGrade, City, Doctor
+# from .forms import HospitalForm
 from django.db.models import Count
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from hospital.decorators import role_required
 
 # 模拟数据库数据
 hospitals = []
@@ -15,11 +17,41 @@ drug_admins = []
 doctor_hospitals = []
 
 @login_required
+@role_required(['system_admin'])
 def hospital_list(request):
+    # 获取筛选参数
+    address = request.GET.get('address')
+    name = request.GET.get('hospital_name')
+    status = request.GET.get('status')
+
+    # 基础查询集
     hospitals = Hospital.objects.all()
-    return render(request, 'hospital/hospital_list.html', {'hospitals': hospitals})
+
+    if address:
+        hospitals = hospitals.filter(address__icontains=address)
+    if name:
+        hospitals = hospitals.filter(name__icontains=name)
+    if status:
+        hospitals = hospitals.filter(status=status)
+
+    # 分页（每页显示10条记录）
+    if status:
+        hospitals = hospitals.filter(status=status)
+
+    # 分页（每页显示10条记录）
+    paginator = Paginator(hospitals, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'hospitals': page_obj,
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
+    }
+
+    return render(request, 'hospital/hospital_list.html', context)
 
 @login_required
+@role_required(['system_admin'])
 def hospital_create(request):
     if request.method == 'POST':
         # 获取表单数据
@@ -64,9 +96,9 @@ def hospital_create(request):
             return render(request, 'hospital/hospital_create.html', {'error': error_message})
     
     # 获取下拉菜单选项
-    grades = HospitalGrade.objects.all()
-    types = HospitalType.objects.all()
-    cities = City.objects.all()
+    # grades = HospitalGrade.objects.all()
+    # types = HospitalType.objects.all()
+    # cities = City.objects.all()
     
     GRADE_CHOICES = [
         {'id': 1, 'name': '三级甲等'},
@@ -108,6 +140,7 @@ def hospital_create(request):
     })
 
 @login_required
+@role_required(['system_admin'])
 def hospital_detail(request, pk):
     """医院详情视图"""
     hospital = get_object_or_404(Hospital, pk=pk)
@@ -123,23 +156,63 @@ def hospital_detail(request, pk):
     })
 
 @login_required
+@role_required(['system_admin'])
 def hospital_update(request, pk):
-    hospital = Hospital.objects.get(pk=pk)
+    hospital = get_object_or_404(Hospital, pk=pk)
+    
     if request.method == 'POST':
-        form = HospitalForm(request.POST, instance=hospital)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'医院 {hospital.name} 更新成功')
+        # 获取表单数据
+        name = request.POST.get('name')
+        grade_id = request.POST.get('grade')
+        type_id = request.POST.get('type')
+        city_id = request.POST.get('city')
+        address = request.POST.get('address')
+        contact = request.POST.get('contact')
+        email = request.POST.get('email')
+        description = request.POST.get('description')
+        founded = request.POST.get('founded')
+        
+        # 验证必要字段
+        if not name or not address or not contact:
+            error_message = '医院名称、地址和联系电话是必填项'
+            messages.error(request, error_message)
+            return render(request, 'hospital/hospital_update.html', {
+                'hospital': hospital,
+                'error': error_message
+            })
+        
+        # 更新医院实例
+        try:
+            # 获取外键关联对象
+            # grade = HospitalGrade.objects.get(id=grade_id) if grade_id else None
+            # type_obj = HospitalType.objects.get(id=type_id) if type_id else None
+            # city = City.objects.get(id=city_id) if city_id else None
+            
+            # 更新医院对象字段
+            hospital.name = name
+            # hospital.grade = grade
+            # hospital.type = type_obj
+            # hospital.city = city
+            hospital.address = address
+            hospital.contact = contact
+            hospital.email = email
+            hospital.description = description
+            hospital.founded = founded
+            
+            # 保存更新
+            hospital.save()
+            
+            messages.success(request, f'医院 {name} 更新成功')
             return redirect(reverse('hospital:hospital_list'))
-        else:
-            messages.error(request, '更新医院失败，请检查输入信息')
-    else:
-        form = HospitalForm(instance=hospital)
+        except Exception as e:
+            error_message = f'更新医院失败: {str(e)}'
+            messages.error(request, error_message)
+            return render(request, 'hospital/hospital_update.html', {
+                'hospital': hospital,
+                'error': error_message
+            })
     
-    grades = HospitalGrade.objects.all()
-    types = HospitalType.objects.all()
-    cities = City.objects.all()
-    
+    # 准备下拉菜单选项
     GRADE_CHOICES = [
         {'id': 1, 'name': '三级甲等'},
         {'id': 2, 'name': '三级乙等'},
@@ -172,69 +245,9 @@ def hospital_update(request, pk):
         {'id': 10, 'name': '西安市'},
     ]
 
-
     return render(request, 'hospital/hospital_update.html', {
-        'form': form,
         'grades': GRADE_CHOICES,
         'types': TYPE_CHOICES,
         'cities': CITY_CHOICES,
         'hospital': hospital,
     })
-
-@login_required
-def doctor_list(request):
-    return render(request, 'hospital/doctor_list.html', {'doctors': doctors})
-
-@login_required
-def doctor_create(request):
-    if request.method == 'POST':
-        # 占位符：处理创建医生的逻辑
-        doctor_name = request.POST.get('name')
-        doctors.append({'name': doctor_name})
-        return redirect(reverse('hospital:doctor_list'))
-    return render(request, 'hospital/doctor_create.html')
-
-@login_required
-def doctor_update(request, pk):
-    if request.method == 'POST':
-        # 占位符：处理更新医生的逻辑
-        doctor_name = request.POST.get('name')
-        doctors[pk]['name'] = doctor_name
-        return redirect(reverse('hospital:doctor_list'))
-    return render(request, 'hospital/doctor_update.html', {'doctor': doctors[pk]})
-
-@login_required
-def drug_admin_list(request):
-    return render(request, 'hospital/drug_admin_list.html', {'drug_admins': drug_admins})
-
-@login_required
-def drug_admin_create(request):
-    if request.method == 'POST':
-        # 占位符：处理创建药品管理员的逻辑
-        drug_admin_name = request.POST.get('name')
-        drug_admins.append({'name': drug_admin_name})
-        return redirect(reverse('hospital:drug_admin_list'))
-    return render(request, 'hospital/drug_admin_create.html')
-
-@login_required
-def drug_admin_update(request, pk):
-    if request.method == 'POST':
-        # 占位符：处理更新药品管理员的逻辑
-        drug_admin_name = request.POST.get('name')
-        drug_admins[pk]['name'] = drug_admin_name
-        return redirect(reverse('hospital:drug_admin_list'))
-    return render(request, 'hospital/drug_admin_update.html', {'drug_admin': drug_admins[pk]})
-
-@login_required
-def doctor_hospital_list(request):
-    return render(request, 'hospital/doctor_hospital_list.html', {'doctor_hospitals': doctor_hospitals})
-
-@login_required
-def doctor_hospital_create(request):
-    if request.method == 'POST':
-        # 占位符：处理创建医生与医院关系的逻辑
-        doctor_id = request.POST.get('doctor_id')
-        hospital_id = request.POST.get('hospital_id')
-        doctor_hospitals.append({'doctor_id': doctor_id, 'hospital_id': hospital_id})
-        return redirect(reverse('hospital:doctor_hospital_list'))
-    return render(request, 'hospital/doctor_hospital_create.html')

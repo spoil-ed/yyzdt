@@ -78,6 +78,7 @@
                     
                     <!-- 桌面端顶部导航 - 主要模块 -->
                     <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item">首页</a>
                         <a href="#" class="top-nav-item">仪表盘</a>
                         <a href="#" class="top-nav-item">用药管理</a>
                         <a href="#" class="top-nav-item">库存管理</a>
@@ -89,31 +90,47 @@
                 
                 <!-- 用户信息和操作 -->
                 <div class="flex items-center">
-                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
                         <i class="fa fa-bell text-xl"></i>
                         <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
                     </button>
-                    <div class="ml-3 relative">
-                        <div>
-                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
-                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
-                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
-                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
-                            </button>
-                        </div>
-                        <!-- 用户菜单 -->
-                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-user mr-2"></i>个人信息
-                            </a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-cog mr-2"></i>账户设置
-                            </a>
-                            <div class="border-t border-gray-100 my-1"></div>
-                            <a href="#" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
-                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
                             </a>
                         </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -131,6 +148,7 @@
                 
                 <!-- 侧边栏菜单 - 根据角色动态显示 -->
                 <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
                     <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         系统管理
                     </div>
@@ -146,6 +164,8 @@
                         <i class="fa fa-building"></i>
                         <span>药企管理</span>
                     </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药品管理
                     </div>
@@ -165,10 +185,8 @@
                         <i class="fa fa-money"></i>
                         <span>销售管理</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-bar-chart"></i>
-                        <span>数据统计</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药企功能
                     </div>
@@ -176,44 +194,20 @@
                         <i class="fa fa-paper-plane"></i>
                         <span>供货信息发布</span>
                     </a>
-                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link">
                         <i class="fa fa-history"></i>
                         <span>供货记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-exchange"></i>
-                        <span>交易管理</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         患者服务
                     </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-user-md"></i>
-                        <span>我的医生</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
                         <i class="fa fa-medkit"></i>
                         <span>用药记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>处方查询</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        监管功能
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-eye"></i>
-                        <span>数据监控</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <span>审查报告</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-search"></i>
-                        <span>合规检查</span>
-                    </a>
+                    {% endif %}
                 </nav>
                 
                 <!-- 侧边栏底部 -->
@@ -242,7 +236,7 @@
                         <p class="text-gray-500 mt-1">管理系统用户账户和权限</p>
                     </div>
                     <div class="flex space-x-3">
-                        <a href="{% url 'core:user_create' %}" class="btn-primary flex items-center px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all hover-scale">
+                        <a href="#" class="btn-primary flex items-center px-4 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all hover-scale">
                             <i class="fa fa-plus mr-2"></i>创建用户
                         </a>
                         <button class="btn-refresh flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
@@ -254,51 +248,53 @@
                 <!-- 筛选区域 -->
                 <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
                     <h3 class="text-lg font-semibold mb-4">筛选条件</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-                            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
-                            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
-                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <option value="">全部角色</option>
-                                <option value="admin">管理员</option>
-                                <option value="doctor">医生</option>
-                                <option value="drug_admin">药品管理员</option>
-                                <option value="patient">患者</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
-                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <option value="">全部状态</option>
-                                <option value="active">活跃</option>
-                                <option value="inactive">未激活</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-6 flex flex-col sm:flex-row gap-3">
-                        <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">注册日期范围</label>
-                            <div class="flex space-x-3">
-                                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                    <form id="filter-form" action="{% url 'core:user_list' %}" method="GET">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                                <input type="text" name="username" value="{{ request.GET.username }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                                <input type="text" name="name" value="{{ request.GET.name }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
+                                <select name="role" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部角色</option>
+                                    <option value="system_admin" {% if request.GET.role == 'system_admin' %}selected{% endif %}>管理员</option>
+                                    <option value="doctor" {% if request.GET.role == 'doctor' %}selected{% endif %}>医生</option>
+                                    <option value="drug_admin" {% if request.GET.role == 'drug_admin' %}selected{% endif %}>药品管理员</option>
+                                    <option value="patient" {% if request.GET.role == 'patient' %}selected{% endif %}>患者</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                                <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部状态</option>
+                                    <option value="active" {% if request.GET.status == 'active' %}selected{% endif %}>活跃</option>
+                                    <option value="inactive" {% if request.GET.status == 'inactive' %}selected{% endif %}>未激活</option>
+                                </select>
                             </div>
                         </div>
-                        <div class="mt-4 sm:mt-6 text-right">
-                            <button class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
-                                <i class="fa fa-filter mr-2"></i>筛选
-                            </button>
-                            <button class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
-                                重置
-                            </button>
+                        <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">注册日期范围</label>
+                                <div class="flex space-x-3">
+                                    <input type="date" name="start_date" value="{{ request.GET.start_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <input type="date" name="end_date" value="{{ request.GET.end_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                </div>
+                            </div>
+                            <div class="mt-4 sm:mt-6 text-right">
+                                <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
+                                    <i class="fa fa-filter mr-2"></i>筛选
+                                </button>
+                                <button type="reset" id="reset-filters" class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                                    重置
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
                 
                 <!-- 用户列表 -->
@@ -364,7 +360,7 @@
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <div class="text-sm text-gray-900">
-                                                {% if user.role == 'admin' %}
+                                                {% if user.role == 'system_admin' %}
                                                 <span class="px-2 py-1 text-xs rounded-full bg-primary/10 text-primary">管理员</span>
                                                 {% elif user.role == 'doctor' %}
                                                 <span class="px-2 py-1 text-xs rounded-full bg-blue/10 text-blue">医生</span>
@@ -372,6 +368,8 @@
                                                 <span class="px-2 py-1 text-xs rounded-full bg-green/10 text-green">药品管理员</span>
                                                 {% elif user.role == 'patient' %}
                                                 <span class="px-2 py-1 text-xs rounded-full bg-yellow/10 text-yellow">患者</span>
+                                                {% elif user.role == 'pharma_admin' %}
+                                                <span class="px-2 py-1 text-xs rounded-full bg-yellow/10 text-yellow">药企管理员</span>
                                                 {% endif %}
                                             </div>
                                         </td>
@@ -389,8 +387,8 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="{% url 'core:user_detail' user.id %}" class="text-primary hover:text-primary/80 mr-3">查看</a>
-                                            <a href="{% url 'core:user_update' user.id %}" class="text-warning hover:text-warning/80 mr-3">编辑</a>
+                                            <a href="#" class="text-primary hover:text-primary/80 mr-3">查看</a>
+                                            <a href="#" class="text-warning hover:text-warning/80 mr-3">编辑</a>
                                             {% if user.is_active %}
                                             <a href="#" class="text-danger hover:text-danger/80" onclick="deactivateUser({{ user.id }})">停用</a>
                                             {% else %}
@@ -416,83 +414,36 @@
                         <!-- 分页 -->
                         <div class="mt-6 flex justify-between items-center">
                             <div class="text-sm text-gray-700">
-                                显示 1 到 5 条，共 {{ total_users }} 条记录
+                                显示 {{ users.start_index }} 到 {{ users.end_index }} 条，共 {{ users.paginator.count }} 条记录
                             </div>
                             <div class="flex space-x-1">
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                {% if users.has_previous %}
+                                <a href="?page={{ users.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50">
                                     <i class="fa fa-angle-left"></i>
                                 </a>
-                                <a href="#" class="px-3 py-1 border border-primary bg-primary text-white rounded-md">1</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">2</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">3</a>
-                                <span class="px-3 py-1 text-gray-500">...</span>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{{ total_pages }}</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-left"></i>
+                                </span>
+                                {% endif %}
+
+                                {% for num in users.paginator.page_range %}
+                                {% if users.number == num %}
+                                <span class="px-3 py-1 border border-primary bg-primary text-white rounded-md">{{ num }}</span>
+                                {% elif num > users.number|add:'-3' and num < users.number|add:'3' %}
+                                <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{{ num }}</a>
+                                {% endif %}
+                                {% endfor %}
+
+                                {% if users.has_next %}
+                                <a href="?page={{ users.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                                     <i class="fa fa-angle-right"></i>
                                 </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 用户统计卡片 -->
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">总用户数</p>
-                                <h3 class="text-3xl font-bold mt-1">{{ total_users }}</h3>
-                                <p class="text-success text-sm mt-2 flex items-center">
-                                    <i class="fa fa-arrow-up mr-1"></i> 5.2% <span class="text-gray-500 ml-1">较上月</span>
-                                </p>
-                            </div>
-                            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                <i class="fa fa-users text-primary text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">管理员</p>
-                                <h3 class="text-3xl font-bold mt-1">{{ admin_count }}</h3>
-                                <p class="text-gray-500 text-sm mt-2">
-                                    占比 {{ admin_percentage }}%
-                                </p>
-                            </div>
-                            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                <i class="fa fa-user-circle text-primary text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">医生</p>
-                                <h3 class="text-3xl font-bold mt-1">{{ doctor_count }}</h3>
-                                <p class="text-gray-500 text-sm mt-2">
-                                    占比 {{ doctor_percentage }}%
-                                </p>
-                            </div>
-                            <div class="w-12 h-12 rounded-full bg-blue/10 flex items-center justify-center">
-                                <i class="fa fa-user-md text-blue text-xl"></i>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="bg-white rounded-xl shadow-sm p-6">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-gray-500 text-sm">药品管理员</p>
-                                <h3 class="text-3xl font-bold mt-1">{{ drug_admin_count }}</h3>
-                                <p class="text-gray-500 text-sm mt-2">
-                                    占比 {{ drug_admin_percentage }}%
-                                </p>
-                            </div>
-                            <div class="w-12 h-12 rounded-full bg-green/10 flex items-center justify-center">
-                                <i class="fa fa-medkit text-green text-xl"></i>
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-right"></i>
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -544,15 +495,16 @@
                 userMenu.classList.add('hidden');
             }
         });
-        
-        // 添加表单验证和提交前确认
-        document.querySelector('form').addEventListener('submit', function(event) {
-            // 可以在这里添加表单验证逻辑
+        // 重置筛选按钮
+        document.getElementById('reset-filters').addEventListener('click', function() {
+            // 重置表单字段
+            document.getElementById('filter-form').reset();
             
-            // 确认提交
-            if (!confirm('确定要提交此药品供应关系信息吗？')) {
-                event.preventDefault();
-            }
+            // 获取当前URL的基本部分（不包含查询参数）
+            const baseUrl = window.location.origin + window.location.pathname;
+            
+            // 使用基本URL重新加载页面，不带任何查询参数
+            window.location.href = baseUrl;
         });
     </script>
 </body>

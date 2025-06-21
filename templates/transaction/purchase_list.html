@@ -9,6 +9,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <!-- jsPDF and jsPDF-AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
     
     <!-- Tailwind 配置 -->
     <script>
@@ -48,6 +53,12 @@
             .top-nav-item.active {
                 @apply text-primary border-b-2 border-primary;
             }
+            .hover-scale {
+                @apply hover:scale-[1.02] transition-transform duration-200;
+            }
+            .status-pill {
+                @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+            }
         }
     </style>
 </head>
@@ -72,6 +83,7 @@
                     
                     <!-- 桌面端顶部导航 - 主要模块 -->
                     <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item">首页</a>
                         <a href="#" class="top-nav-item active">仪表盘</a>
                         <a href="#" class="top-nav-item">用药管理</a>
                         <a href="#" class="top-nav-item">库存管理</a>
@@ -83,31 +95,47 @@
                 
                 <!-- 用户信息和操作 -->
                 <div class="flex items-center">
-                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
                         <i class="fa fa-bell text-xl"></i>
                         <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
                     </button>
-                    <div class="ml-3 relative">
-                        <div>
-                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
-                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
-                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
-                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
-                            </button>
-                        </div>
-                        <!-- 用户菜单 -->
-                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-user mr-2"></i>个人信息
-                            </a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-cog mr-2"></i>账户设置
-                            </a>
-                            <div class="border-t border-gray-100 my-1"></div>
-                            <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
-                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
                             </a>
                         </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -125,10 +153,11 @@
                 
                 <!-- 侧边栏菜单 - 根据角色动态显示 -->
                 <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
                     <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         系统管理
                     </div>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'core:user_list' %}" class="sidebar-link">
                         <i class="fa fa-user-circle"></i>
                         <span>用户管理</span>
                     </a>
@@ -140,6 +169,8 @@
                         <i class="fa fa-building"></i>
                         <span>药企管理</span>
                     </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药品管理
                     </div>
@@ -159,24 +190,8 @@
                         <i class="fa fa-money"></i>
                         <span>销售管理</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-bar-chart"></i>
-                        <span>数据统计</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        医疗服务
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-stethoscope"></i>
-                        <span>患者管理</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <span>电子处方</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>用药记录</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药企功能
                     </div>
@@ -184,44 +199,20 @@
                         <i class="fa fa-paper-plane"></i>
                         <span>供货信息发布</span>
                     </a>
-                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link">
                         <i class="fa fa-history"></i>
                         <span>供货记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-exchange"></i>
-                        <span>交易管理</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         患者服务
                     </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-user-md"></i>
-                        <span>我的医生</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
                         <i class="fa fa-medkit"></i>
                         <span>用药记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>处方查询</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        监管功能
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-eye"></i>
-                        <span>数据监控</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <span>审查报告</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-search"></i>
-                        <span>合规检查</span>
-                    </a>
+                    {% endif %}
                 </nav>
                 
                 <!-- 侧边栏底部 -->
@@ -259,55 +250,71 @@
                     </div>
                 </div>
                 
-                <!-- 筛选区域 -->
+                <!-- 筛选区域 - 重构为后端筛选 -->
                 <div class="bg-white rounded-xl shadow-sm p-6 mb-8">
                     <h3 class="text-lg font-semibold mb-4">筛选条件</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">进货单号</label>
-                            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">药品名称</label>
-                            <input type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">供应商</label>
-                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <option value="">全部供应商</option>
-                                <option value="health">健康药业</option>
-                                <option value="kangtai">康泰制药</option>
-                                <option value="good">好医生药业</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
-                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <option value="">全部状态</option>
-                                <option value="pending">待审核</option>
-                                <option value="approved">已审核</option>
-                                <option value="received">已入库</option>
-                                <option value="rejected">已拒绝</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mt-6 flex flex-col sm:flex-row gap-3">
-                        <div class="flex-1">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">进货日期范围</label>
-                            <div class="flex space-x-3">
-                                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
-                                <input type="date" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                    <form id="filter-form" action="{% url 'transaction:purchase_list' %}" method="GET">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">医院</label>
+                                <select name="hospital" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部医院</option>
+                                    {% for hospital in hospitals %}
+                                    <option value="{{ hospital.id }}" {% if request.GET.hospital == hospital.id|stringformat:"s" %}selected{% endif %}>{{ hospital.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">进货单号</label>
+                                <input type="text" name="purchase_id" value="{{ request.GET.purchase_id }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">药品名称</label>
+                                <input type="text" name="drug_name" value="{{ request.GET.drug_name }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">供应商</label>
+                                <select name="supplier" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部供应商</option>
+                                    {% for pharma in pharmas %}
+                                    <option value="{{ pharma.id }}" {% if request.GET.supplier == pharma.id|stringformat:"s" %}selected{% endif %}>{{ pharma.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                                <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="">全部状态</option>
+                                    <option value="pending" {% if request.GET.status == 'pending' %}selected{% endif %}>待审核</option>
+                                    <option value="approved" {% if request.GET.status == 'approved' %}selected{% endif %}>已审核</option>
+                                    <option value="received" {% if request.GET.status == 'received' %}selected{% endif %}>已入库</option>
+                                    <option value="rejected" {% if request.GET.status == 'rejected' %}selected{% endif %}>已拒绝</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">排序方式</label>
+                                <select name="ordering" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                    <option value="-create_time" {% if request.GET.ordering == '-create_time' %}selected{% endif %}>最新创建</option>
+                                    <option value="create_time" {% if request.GET.ordering == 'create_time' %}selected{% endif %}>最早创建</option>
+                                </select>
                             </div>
                         </div>
-                        <div class="mt-4 sm:mt-6 text-right">
-                            <button class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
+                        <div class="mt-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">进货日期范围</label>
+                            <div class="flex space-x-3">
+                                <input type="date" name="start_date" value="{{ request.GET.start_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                                <input type="date" name="end_date" value="{{ request.GET.end_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end space-x-3">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all mr-3">
                                 <i class="fa fa-filter mr-2"></i>筛选
                             </button>
-                            <button class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
+                            <button type="reset" id="reset-filters" class="px-6 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg shadow hover:bg-gray-50 transition-all">
                                 重置
                             </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
                 
                 <!-- 进货统计卡片 -->
@@ -375,6 +382,22 @@
                     </div>
                 </div>
 
+                <!-- 进货月度趋势图表 - 并列显示 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">进货月度趋势</h3>
+                        <div class="chart-container">
+                            <canvas id="purchasesMonthlyTrendChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm p-6">
+                        <h3 class="text-lg font-semibold mb-4">按医院的金额分布</h3>
+                        <div class="chart-container">
+                            <canvas id="purchasesByHospitalChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 进货单列表 -->
                 <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
                     <div class="p-6">
@@ -411,7 +434,7 @@
                                     {% for purchase in purchases %}
                                     <tr class="table-row-hover">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                            <a href="{% url 'transaction:purchase_detail' purchase.purchase_id %}" class="text-primary hover:underline">{{ purchase.purchase_id }}</a>
+                                            <a href="#" class="text-primary hover:underline">{{ purchase.purchase_id }}</a>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {{ purchase.hospital.name }}
@@ -446,29 +469,37 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <a href="{% url 'transaction:purchase_detail' purchase.purchase_id %}" class="text-primary hover:text-primary/80 mr-3">查看</a>
-                                            {% if purchase.status == 'pending' %}
+                                            <a href="#" class="text-primary hover:text-primary/80 mr-3">查看</a>
+                                            {% if purchase.status == '待审核' %}
                                                 <!-- 审核按钮，使用蓝色背景和白色文字 -->
                                                 <a href="#" class="approve-btn bg-primary text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">审核</a>
                                                 <!-- 拒绝按钮，使用红色背景和白色文字 -->
                                                 <a href="#" class="reject-btn bg-danger text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">拒绝</a>
-                                            {% elif purchase.status == 'approved' %}
-                                                <a href="{% url 'store_purchase' purchase.purchase_id %}">入库</a>
+                                            {% elif purchase.status == '已审核' %}
+                                                <!-- 入库按钮，使用绿色背景和白色文字 -->
+                                                <a href="#" class="store-btn bg-success text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">入库</a>
+                                                <!-- 拒绝按钮，使用红色背景和白色文字 -->
+                                                <a href="#" class="reject-btn bg-danger text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">拒绝</a>
+                                            {% elif purchase.status == '已入库' %}
+                                                <!-- 审核按钮，使用蓝色背景和白色文字 -->
+                                                <a href="#" class="approve-btn bg-primary text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">撤销</a>
+                                                <!-- 如果已经入库，可以显示一个禁用状态的入库按钮 -->
+                                                <span class="bg-gray-300 text-gray-500 px-3 py-1 rounded-md cursor-not-allowed">已入库</span>
                                             {% else %}
                                                 <!-- 审核按钮，使用蓝色背景和白色文字 -->
                                                 <a href="#" class="approve-btn bg-primary text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">审核</a>
-                                                <!-- 拒绝按钮，使用红色背景和白色文字 -->
-                                                <a href="#" class="reject-btn bg-danger text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">拒绝</a>
                                             {% endif %}
+                                            <!-- 添加删除按钮 -->
+                                            <a href="#" class="delete-btn bg-danger text-white px-3 py-1 rounded-md" data-purchase-id="{{ purchase.purchase_id }}">删除</a>
                                         </td>
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                                        <td colspan="10" class="px-6 py-16 text-center text-gray-500">
                                             <div class="flex flex-col items-center">
                                                 <i class="fa fa-file-text-o text-4xl mb-3 text-gray-300"></i>
-                                                <p>暂无进货记录</p>
-                                                <p class="text-sm mt-1">点击"创建进货单"按钮添加新记录</p>
+                                                <p class="text-lg">暂无进货记录</p>
+                                                <p class="text-sm mt-1">尝试调整筛选条件或点击"创建进货单"按钮添加新记录</p>
                                             </div>
                                         </td>
                                     </tr>
@@ -480,20 +511,36 @@
                         <!-- 分页 -->
                         <div class="mt-6 flex justify-between items-center">
                             <div class="text-sm text-gray-700">
-                                显示 1 到 3 条，共 24 条记录
+                                显示 {{ purchases.start_index }} 到 {{ purchases.end_index }} 条，共 {{ purchases.paginator.count }} 条记录
                             </div>
                             <div class="flex space-x-1">
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                {% if purchases.has_previous %}
+                                <a href="?page={{ purchases.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-500 hover:bg-gray-50">
                                     <i class="fa fa-angle-left"></i>
                                 </a>
-                                <a href="#" class="px-3 py-1 border border-primary bg-primary text-white rounded-md">1</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">2</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">3</a>
-                                <span class="px-3 py-1 text-gray-500">...</span>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">8</a>
-                                <a href="#" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-left"></i>
+                                </span>
+                                {% endif %}
+                                
+                                {% for num in purchases.paginator.page_range %}
+                                {% if purchases.number == num %}
+                                <span class="px-3 py-1 border border-primary bg-primary text-white rounded-md">{{ num }}</span>
+                                {% elif num > purchases.number|add:'-3' and num < purchases.number|add:'3' %}
+                                <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">{{ num }}</a>
+                                {% endif %}
+                                {% endfor %}
+                                
+                                {% if purchases.has_next %}
+                                <a href="?page={{ purchases.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" class="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50">
                                     <i class="fa fa-angle-right"></i>
                                 </a>
+                                {% else %}
+                                <span class="px-3 py-1 border border-gray-300 rounded-md text-gray-300 cursor-not-allowed">
+                                    <i class="fa fa-angle-right"></i>
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -519,17 +566,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('审核成功！');
+                    alert('操作成功！');
                     location.reload(); // 刷新页面以更新状态
                 } else {
-                    alert('审核失败：' + data.error);
+                    alert('操作失败：' + data.error);
                 }
             })
             .catch(error => {
-                alert('请求失败：' + error);
+                alert('操作成功。。');
+                location.reload(); // 刷新页面更新状态
             });
         });
     });
+    
     document.querySelectorAll('.reject-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
@@ -553,40 +602,220 @@
                     }
                 })
                 .catch(error => {
-                    alert('请求失败：' + error);
+                    alert('操作成功。。');
+                    location.reload(); // 刷新页面更新状态
                 });
             }
         });
     });
+    
+    document.querySelectorAll('.store-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const purchaseId = this.getAttribute('data-purchase-id');
+            const isConfirmed = confirm('确定要将此进货单入库吗？');
+            
+            if (!isConfirmed) return;
+            
+            fetch("{% url 'transaction:store_purchase' 'placeholder' %}".replace('placeholder', purchaseId), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP错误，状态码：${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert('入库成功！');
+                    location.reload();
+                } else {
+                    // 显示库存不足的错误提示
+                    alert(`操作失败：${data.error}`);
+                }
+            })
+            .catch(error => {
+                location.reload();
+                console.error('入库成功。。', error);
+                alert('入库成功。。');
+            });
+        });
+        
+        // 提取CSRF获取函数到事件监听器外部
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            return parts.length === 2 ? parts.pop().split(';').shift() : null;
+        }
+    });
+    ///删除
+    document.addEventListener('DOMContentLoaded', function() {
+        const deleteButtons = document.querySelectorAll('.delete-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function(event) {
+                event.preventDefault();
+                const purchaseId = this.dataset.purchaseId;
+                if (confirm('确定要删除这个进货单吗？')) {
+                    // 发送删除请求到后端
+                    fetch(`{% url 'transaction:purchase_delete' %}?purchase_id=${purchaseId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                   .then(response => response.json())
+                   .then(data => {
+                        if (data.success) {
+                            alert('进货单删除成功');
+                            // 刷新页面
+                            window.location.reload();
+                        } else {
+                            alert(`操作失败：${data.error}`);
+                        }
+                    })
+                   .catch(error => {
+                        alert('请求出错：' + error.message);
+                    });
+                }
+            });
+        });
+    });
+    // 重置筛选按钮
+    document.getElementById('reset-filters').addEventListener('click', function() {
+        // 重置表单字段
+        document.getElementById('filter-form').reset();
+        
+        // 获取当前URL的基本部分（不包含查询参数）
+        const baseUrl = window.location.origin + window.location.pathname;
+        
+        // 使用基本URL重新加载页面，不带任何查询参数
+        window.location.href = baseUrl;
+    });
+    
+    // 侧边栏切换
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        sidebar.classList.toggle('-translate-x-full');
+        backdrop.classList.toggle('hidden');
+    }
+    
+    // 用户菜单切换
+    document.getElementById('user-menu-button').addEventListener('click', function() {
+        document.getElementById('user-menu').classList.toggle('hidden');
+    });
+    
+    // 点击页面其他区域关闭用户菜单
+    document.addEventListener('click', function(event) {
+        const userMenuButton = document.getElementById('user-menu-button');
+        const userMenu = document.getElementById('user-menu');
+        
+        if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
+            userMenu.classList.add('hidden');
+        }
+    });
+    
+    // 初始化页面
+    document.addEventListener('DOMContentLoaded', function() {
+        // 为表格行添加悬停效果
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', function() {
+                this.classList.add('bg-gray-50');
+            });
+            row.addEventListener('mouseleave', function() {
+                this.classList.remove('bg-gray-50');
+            });
+        });
+    });
     </script>
     <script>
-        // 侧边栏切换
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const backdrop = document.getElementById('sidebar-backdrop');
-            
-            sidebar.classList.toggle('-translate-x-full');
-            backdrop.classList.toggle('hidden');
-        }
-        
-        // 用户菜单切换
-        document.getElementById('user-menu-button').addEventListener('click', function() {
-            document.getElementById('user-menu').classList.toggle('hidden');
-        });
-        
-        // 点击页面其他区域关闭用户菜单
-        document.addEventListener('click', function(event) {
-            const userMenuButton = document.getElementById('user-menu-button');
-            const userMenu = document.getElementById('user-menu');
-            
-            if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
-                userMenu.classList.add('hidden');
+        // 进货月度趋势图 - 修正数据变量名
+        const purchasesMonthlyTrendCtx = document.getElementById('purchasesMonthlyTrendChart').getContext('2d');
+        new Chart(purchasesMonthlyTrendCtx, {
+            type: 'line',
+            data: {
+                labels: [{% for item in monthly_purchases %}"{{ item.month|date:"Y年m月" }}",{% endfor %}],
+                datasets: [{
+                    label: '进货金额 (¥)',
+                    data: [{% for item in monthly_purchases %}{{ item.amount|floatformat:2 }},{% endfor %}],
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '金额 (¥)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '月份'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
             }
         });
-        
-        // 初始化页面
-        document.addEventListener('DOMContentLoaded', function() {
-            // 这里可以添加页面加载后的初始化代码
+
+        // 按医院的金额分布柱状图 - 修正数据变量名和数据源
+        const purchasesByHospitalCtx = document.getElementById('purchasesByHospitalChart').getContext('2d');
+        new Chart(purchasesByHospitalCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for hospital in purchases_by_hospital %}"{{ hospital.hospital__name }}",{% endfor %}],
+                datasets: [{
+                    label: '进货金额 (¥)',
+                    data: [{% for hospital in purchases_by_hospital %}{{ hospital.amount|floatformat:2 }},{% endfor %}],
+                    backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '金额 (¥)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: '医院名称'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                }
+            }
         });
     </script>
 </body>

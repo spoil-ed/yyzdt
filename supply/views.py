@@ -1,40 +1,26 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
-from django.http import HttpResponse
+from datetime import datetime, timedelta
 from django.contrib import messages
-from .models import Pharma, Supply, Inventory, WarningLog, PharmaGrade, PharmaType, PharmaDrugSupply, City, Drug  # 假设这些模型已定义
-from hospital.models import Hospital  # 假设这些模型已定义
-from django.utils import timezone
 from django.contrib.auth.decorators import login_required
-
-# 模拟数据库数据（实际应用中应从数据库获取）
-pharmas_data = [
-    {'id': 1, 'name': '国药控股', 'phone': '010-12345678', 'address': '北京市朝阳区', 'description': '大型医药企业'},
-    {'id': 2, 'name': '上海医药', 'phone': '021-87654321', 'address': '上海市浦东新区', 'description': '知名药企'},
-]
-
-supplies_data = [
-    {'batch_code': 'SP2023001', 'drug_name': '阿司匹林', 'pharma_id': 1, 'quantity': 1000, 'price': 10.5, 'status': 'available', 'expiry_date': '2025-12-31', 'created_at': '2023-01-01', 'updated_at': '2023-01-01'},
-    {'batch_code': 'SP2023002', 'drug_name': '布洛芬', 'pharma_id': 2, 'quantity': 500, 'price': 15.8, 'status': 'limited', 'expiry_date': '2024-11-15', 'created_at': '2023-01-10', 'updated_at': '2023-01-15'},
-]
-
-inventories_data = [
-    {'id': 1, 'drug_id': 1, 'drug_name': '阿司匹林', 'hospital_id': 1, 'hospital_name': '北京协和医院', 'quantity': 200, 'warning_threshold': 50, 'status': 'normal'},
-    {'id': 2, 'drug_id': 2, 'drug_name': '布洛芬', 'hospital_id': 1, 'hospital_name': '北京协和医院', 'quantity': 30, 'warning_threshold': 50, 'status': 'warning'},
-]
-
-warning_logs_data = [
-    {'id': 1, 'drug_id': 2, 'drug_name': '布洛芬', 'hospital_id': 1, 'hospital_name': '北京协和医院', 'quantity': 30, 'warning_threshold': 50, 'created_at': '2023-05-10', 'status': 'pending'},
-]
+from django.core.paginator import Paginator
+from django.db.models import Count, F, Q, Sum
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+from hospital.models import Hospital
+from supply.decorators import role_required
+from .models import Drug, Inventory, Pharma, PharmaDrugSupply
 
 @login_required
+@role_required(['system_admin'])
 # 药企管理视图
 def pharma_list(request):
-    # 实际应用中应从数据库获取：Pharmas.objects.all()
     pharmas = Pharma.objects.all()
     return render(request, 'supply/pharma_list.html', {'pharmas': pharmas})
 
 @login_required
+@role_required(['system_admin'])
 def pharma_create(request):
     if request.method == 'POST':
         # 获取表单数据
@@ -124,6 +110,7 @@ def pharma_create(request):
     })
 
 @login_required
+@role_required(['system_admin'])
 def pharma_update(request, pk):
     pharma = get_object_or_404(Pharma, id=pk)
     
@@ -141,6 +128,7 @@ def pharma_update(request, pk):
     return render(request, 'supply/pharma_update.html', {'pharma': pharma})
 
 @login_required
+@role_required(['system_admin'])
 def pharma_detail(request, pk):
     """药企详情视图"""
     pharma = get_object_or_404(Pharma, pk=pk)
@@ -154,235 +142,252 @@ def pharma_detail(request, pk):
         # 'pharma_inventories': pharma_inventories
     })
 
-@login_required
-# 供货管理视图
-def supply_list(request):
-    # 实际应用中应从数据库获取：Supply.objects.all()
-    supplies = supplies_data
-    
-    # 处理搜索过滤
-    drug_name = request.GET.get('drug_name')
-    pharma_id = request.GET.get('pharma')
-    status = request.GET.get('status')
-    
-    if drug_name:
-        supplies = [s for s in supplies if drug_name.lower() in s['drug_name'].lower()]
-    if pharma_id:
-        supplies = [s for s in supplies if str(s['pharma_id']) == pharma_id]
-    if status:
-        supplies = [s for s in supplies if s['status'] == status]
-    
-    return render(request, 'supply/supply_list.html', {'supplies': supplies, 'pharmas': pharmas_data})
 
 @login_required
-def supply_create(request):
-    if request.method == 'POST':
-        # 实际应用中应保存到数据库
-        new_supply = {
-            'batch_code': request.POST.get('batch_code'),
-            'drug_name': request.POST.get('drug_name'),
-            'pharma_id': int(request.POST.get('pharma')),
-            'quantity': int(request.POST.get('quantity')),
-            'price': float(request.POST.get('price')),
-            'status': request.POST.get('status'),
-            'expiry_date': request.POST.get('expiry_date'),
-            'created_at': '2023-01-01',  # 实际应用中应使用当前时间
-            'updated_at': '2023-01-01',  # 实际应用中应使用当前时间
-            'description': request.POST.get('description')
-        }
-        supplies_data.append(new_supply)
-        return redirect(reverse('supply:supply_list'))
-    
-    return render(request, 'supply/supply_create.html', {'pharmas': pharmas_data})
-
-@login_required
-def supply_detail(request, batch_code):
-    # 实际应用中应从数据库获取：supply = get_object_or_404(Supply, batch_code=batch_code)
-    supply = next((s for s in supplies_data if s['batch_code'] == batch_code), None)
-    
-    if not supply:
-        return HttpResponse("供货记录不存在", status=404)
-    
-    # 获取药企信息
-    pharma = next((p for p in pharmas_data if p['id'] == supply['pharma_id']), None)
-    supply['pharma'] = pharma
-    
-    return render(request, 'supply/supply_detail.html', {'supply': supply})
-
-@login_required
+@role_required(['system_admin', 'pharma_admin'])
 def pharma_drug_supply(request):
-    pharma_data = None
-    return render(request, 'supply/pharma_drug_supply.html', {'pharmas': pharmas_data})
+    # 获取当前用户
+    user = request.user
+    
+    # 筛选条件处理
+    pharma_id = request.GET.get('pharma')
+    drug_id = request.GET.get('drug')
+    is_primary_supplier = request.GET.get('is_primary_supplier')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    ordering = request.GET.get('ordering', '-create_time')
+    
+    # 获取所有供应关系
+    queryset = PharmaDrugSupply.objects.select_related('pharma', 'drug').all()
+    
+    # 筛选：根据药企
+    if pharma_id:
+        queryset = queryset.filter(pharma_id=pharma_id)
+    
+    # 筛选：根据药品
+    if drug_id:
+        queryset = queryset.filter(drug_id=drug_id)
+    
+    # 筛选：根据是否为主要供应商
+    if is_primary_supplier in ['True', 'False']:
+        queryset = queryset.filter(is_primary_supplier=(is_primary_supplier == 'True'))
+    
+    # 筛选：根据供应开始日期范围
+    if start_date and end_date:
+        queryset = queryset.filter(supply_start_date__range=[start_date, end_date])
+    elif start_date:
+        queryset = queryset.filter(supply_start_date__gte=start_date)
+    elif end_date:
+        queryset = queryset.filter(supply_start_date__lte=end_date)
+    
+    # 排序
+    queryset = queryset.order_by(ordering)
+    
+    
+    # 分页处理
+    paginator = Paginator(queryset, 10)  # 每页显示10条记录
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 获取药企和药品列表，用于筛选下拉框
+    pharma_list = Pharma.objects.all()
+    drug_list = Drug.objects.all()
+    
+    # 准备上下文数据
+    context = {
+        'pharma_drug_supplies': page_obj,
+        'pharma_list': pharma_list,
+        'drug_list': drug_list,
+        # 'current_supply_count': current_supply_count,
+        # 'primary_supplier_count': primary_supplier_count,
+        # 'upcoming_expiry_count': upcoming_expiry_count,
+        # 'today_new_count': today_new_count,
+        'request': request  # 用于在模板中访问GET参数
+    }
+    
+    return render(request, 'supply/pharma_drug_supply.html', context)
+
+
+@require_POST
+@role_required(['system_admin', 'pharma_admin'])
+def pharma_drug_supply_delete(request, pk):
+    """删除药企药品供应关系"""
+    try:
+        # 获取要删除的供应关系对象
+        supply = get_object_or_404(PharmaDrugSupply, id=pk)
+        
+        # 执行删除操作
+        supply.delete()
+        
+        # 返回成功响应
+        return JsonResponse({
+            'success': True,
+            'message': '供应关系已成功删除'
+        })
+    except Exception as e:
+        # 返回错误响应
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 @login_required
+@role_required(['system_admin', 'pharma_admin'])
 def pharma_drug_supply_create(request):
-    # 获取所有药企和药品数据，用于表单选择
-    pharmas = Pharma.objects.all()
-    drugs = Drug.objects.all()
-    
     if request.method == 'POST':
-        # 处理表单提交
+        # 获取表单数据
         pharma_id = request.POST.get('pharma')
         drug_id = request.POST.get('drug')
-        start_date = request.POST.get('supply_start_date')
-        end_date = request.POST.get('supply_end_date')
-        is_primary = request.POST.get('is_primary_supplier') == 'on'
-        cert_number = request.POST.get('certification_number')
+        supply_start_date = request.POST.get('supply_start_date')
+        supply_end_date = request.POST.get('supply_end_date')
+        is_primary_supplier = request.POST.get('is_primary_supplier') == 'on'
+        certification_number = request.POST.get('certification_number')
         remark = request.POST.get('remark')
-        
-        # 验证必填字段
-        errors = []
-        if not pharma_id:
-            errors.append('请选择药企')
-        if not drug_id:
-            errors.append('请选择药品')
-        if not start_date:
-            errors.append('请选择供应开始日期')
-        
-        # 检查药企-药品组合是否已存在
-        if pharma_id and drug_id:
-            if PharmaDrugSupply.objects.filter(pharma_id=pharma_id, drug_id=drug_id).exists():
-                errors.append('该药企与药品的供应关系已存在')
-        
-        # 验证日期逻辑
-        if start_date and end_date:
-            try:
-                if timezone.datetime.strptime(start_date, '%Y-%m-%d').date() > timezone.datetime.strptime(end_date, '%Y-%m-%d').date():
-                    errors.append('供应开始日期不能晚于结束日期')
-            except ValueError:
-                errors.append('日期格式不正确')
-        
-        if errors:
-            # 显示错误信息
-            for error in errors:
-                messages.error(request, error)
-            return render(request, 'supply/pharma_drug_supply_create.html', {
-                'pharmas': pharmas,
-                'drugs': drugs,
-                'form_data': request.POST  # 返回已填写的数据
-            })
-        
-        # 创建新的供应关系
+
         try:
-            supply = PharmaDrugSupply.objects.create(
-                pharma_id=pharma_id,
-                drug_id=drug_id,
-                supply_start_date=start_date,
-                supply_end_date=end_date or None,
-                is_primary_supplier=is_primary,
-                certification_number=cert_number,
-                remark=remark
+            # 获取药企和药品实例
+            pharma = Pharma.objects.get(id=pharma_id)
+            drug = Drug.objects.get(id=drug_id)
+
+            # 创建新的药企药品供应关系实例
+            supply = PharmaDrugSupply(
+                pharma=pharma,
+                drug=drug,
+                supply_start_date=supply_start_date,
+                supply_end_date=supply_end_date or None,
+                is_primary_supplier=is_primary_supplier,
+                certification_number=certification_number or None,
+                remark=remark or None
             )
-            messages.success(request, f'成功创建 {supply} 的供应关系')
-            return redirect('supply:pharma_drug_supply_list')  # 重定向到供应关系列表
+
+            # 保存实例
+            supply.save()
+
+            # 显示成功消息
+            messages.success(request, '药企药品供应关系创建成功！')
+
+            # 重定向到供应列表页面（你可以根据实际情况修改重定向的 URL）
+            return redirect('supply:pharma_drug_supply')
+
+        except (Pharma.DoesNotExist, Drug.DoesNotExist):
+            # 显示错误消息
+            messages.error(request, '药企或药品不存在，请重新选择。')
         except Exception as e:
-            messages.error(request, f'创建供应关系失败: {str(e)}')
-    
+            # 显示其他错误消息
+            messages.error(request, f'创建失败：{str(e)}')
+
+    # 获取药企和药品列表，用于表单下拉框
+    pharma_list = Pharma.objects.all()
+    drug_list = Drug.objects.all()
+
+    # 渲染创建页面
     return render(request, 'supply/pharma_drug_supply_create.html', {
-        'pharmas': pharmas,
-        'drugs': drugs
+        'pharma_list': pharma_list,
+        'drug_list': drug_list
     })
 
-from django.db.models import Count, Sum, F, Q
-from django.shortcuts import render
-from .models import Inventory
-from transaction.models import Purchase
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def inventory_list(request):
-    # 获取用户选择的医院 ID
-    selected_hospital_id = request.GET.get('hospital')
+    # 获取当前时间相关日期范围
+    now = timezone.now()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_of_month = (start_of_month + timezone.timedelta(days=32)).replace(day=1) - timezone.timedelta(days=1)
 
-    if selected_hospital_id :
-        # 如果用户选择了某个医院，筛选该医院的库存数据
-        hospital = Hospital.objects.get(id=selected_hospital_id)
-        inventory_list = Inventory.objects.filter(hospital=hospital)
-    else:
-        # 如果用户选择了“所有医院”，显示所有库存数据
-        inventory_list = Inventory.objects.all()
+    # 计算上月同期范围
+    last_month_start = (start_of_month - timezone.timedelta(days=1)).replace(day=1)
+    last_month_end = start_of_month - timezone.timedelta(seconds=1)
 
-    # 计算总药品数（总库存记录数）
-    total_drugs = inventory_list.count()
+    # 获取筛选参数
+    hospital_id = request.GET.get('hospital')
+    drug_name = request.GET.get('drug_name')
+    status = request.GET.get('status')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    ordering = request.GET.get('ordering', '-last_updated')  # 默认按更新时间降序
 
-    # 计算低库存药品数
-    low_stock_drugs = inventory_list.filter(current_quantity__lt=F('warning_threshold')).count()
+    # 基础查询集（使用select_related减少数据库查询）
+    inventories = Inventory.objects.select_related('hospital', 'drug')
 
-    # 计算库存预警比例
-    low_stock_percentage = (low_stock_drugs / total_drugs * 100) if total_drugs > 0 else 0
+    # 应用筛选条件
+    if hospital_id:
+        inventories = inventories.filter(hospital_id=hospital_id)
 
-    # 计算本月入库金额
-    current_month = timezone.now().month
-    current_year = timezone.now().year
-    if selected_hospital_id:
-        # 如果选择了特定医院，计算该医院本月入库金额
-        total_incoming = Purchase.objects.filter(
-            create_time__month=current_month,
-            create_time__year=current_year,
-            hospital=hospital
-        ).annotate(
-            total_price=F('quantity') * F('price')
-        ).aggregate(Sum('total_price'))['total_price__sum'] or 0
-    else:
-        # 如果选择所有医院，计算所有医院本月入库金额
-        total_incoming = Purchase.objects.filter(
-            create_time__month=current_month,
-            create_time__year=current_year
-        ).annotate(
-            total_price=F('quantity') * F('price')
-        ).aggregate(Sum('total_price'))['total_price__sum'] or 0
+    if drug_name:
+        inventories = inventories.filter(drug__name__icontains=drug_name)
 
+    if status:
+        if status == '充足':
+            inventories = inventories.filter(current_quantity__gte=F('warning_threshold'))
+        elif status == '低库存':
+            inventories = inventories.filter(
+                current_quantity__lt=F('warning_threshold'),
+                current_quantity__gt=0
+            )
+        elif status == '缺货':
+            inventories = inventories.filter(current_quantity__lte=0)
+
+    if start_date and end_date:
+        inventories = inventories.filter(last_updated__range=[start_date, end_date])
+    elif start_date:
+        inventories = inventories.filter(last_updated__gte=start_date)
+    elif end_date:
+        inventories = inventories.filter(last_updated__lte=end_date)
+
+    # 排序
+    inventories = inventories.order_by(ordering)
+
+    # 计算统计数据（基于筛选后的数据集）
+    # 本月库存总量
+    this_month_inventory = inventories.filter(
+        last_updated__range=[start_of_month, end_of_month]
+    )
+    total_inventory_this_month = this_month_inventory.aggregate(
+        total=Sum('current_quantity')
+    )['total'] or 0
+
+    # 上月库存总量
+    last_month_inventory = inventories.filter(
+        last_updated__range=[last_month_start, last_month_end]
+    )
+    total_inventory_last_month = last_month_inventory.aggregate(
+        total=Sum('current_quantity')
+    )['total'] or 0
+
+    # 计算库存总量同比增长率
+    inventory_growth = 0
+    if total_inventory_last_month > 0:
+        inventory_growth = ((total_inventory_this_month - total_inventory_last_month) / total_inventory_last_month) * 100
+
+    # 库存预警数量
+    low_stock_inventories = inventories.filter(current_quantity__lte=F('warning_threshold'))
+    low_stock_count = low_stock_inventories.count()
+
+    # 库存预警比例
+    total_count = inventories.count()
+    low_stock_percentage = 0
+    if total_count > 0:
+        low_stock_percentage = (low_stock_count / total_count) * 100
+
+    # 分页（每页显示10条记录）
+    paginator = Paginator(inventories, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # 获取医院列表，用于筛选下拉框
     hospitals = Hospital.objects.all()
 
-    return render(request, 'supply/inventory_list.html', {
-        'inventory_list': inventory_list,
-        'total_drugs': total_drugs,
-        'low_stock_drugs': low_stock_drugs,
-        'low_stock_percentage': low_stock_percentage,
-        'total_incoming': total_incoming,
+    context = {
+        'inventories': page_obj,
         'hospitals': hospitals,
-        'selected_hospital': selected_hospital_id,
-    })
+        'total_inventory_this_month': total_inventory_this_month,
+        'inventory_growth': round(inventory_growth, 1),
+        'low_stock_count': low_stock_count,
+        'low_stock_percentage': round(low_stock_percentage, 1),
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
+    }
 
-@login_required
-def inventory_update(request, drug_id, hospital_id):
-    # 实际应用中应从数据库获取：inventory = get_object_or_404(Inventory, drug_id=drug_id, hospital_id=hospital_id)
-    inventory = next((i for i in inventories_data if i['drug_id'] == drug_id and i['hospital_id'] == hospital_id), None)
-    
-    if not inventory:
-        return HttpResponse("库存记录不存在", status=404)
-    
-    if request.method == 'POST':
-        # 实际应用中应更新数据库记录
-        inventory['warning_threshold'] = int(request.POST.get('warning_threshold'))
-        # 根据库存数量和阈值更新状态
-        if inventory['quantity'] < inventory['warning_threshold']:
-            inventory['status'] = 'warning'
-        else:
-            inventory['status'] = 'normal'
-        
-        # 如果触发预警，添加预警记录
-        if inventory['status'] == 'warning':
-            new_warning = {
-                'id': len(warning_logs_data) + 1,
-                'drug_id': drug_id,
-                'drug_name': inventory['drug_name'],
-                'hospital_id': hospital_id,
-                'hospital_name': inventory['hospital_name'],
-                'quantity': inventory['quantity'],
-                'warning_threshold': inventory['warning_threshold'],
-                'created_at': '2023-05-10',  # 实际应用中应使用当前时间
-                'status': 'pending'
-            }
-            warning_logs_data.append(new_warning)
-        
-        return redirect(reverse('supply:inventory_list'))
-    
-    return render(request, 'supply/inventory_update.html', {'inventory': inventory})
+    return render(request, 'supply/inventory_list.html', context)
 
-@login_required
-# 预警日志视图
-def warning_log_list(request):
-    # 实际应用中应从数据库获取：WarningLog.objects.all()
-    warning_logs = warning_logs_data
-    return render(request, 'supply/warning_log_list.html', {'warning_logs': warning_logs})
 

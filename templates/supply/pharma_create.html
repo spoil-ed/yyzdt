@@ -75,6 +75,7 @@
                     
                     <!-- 桌面端顶部导航 - 主要模块 -->
                     <nav class="hidden md:ml-10 md:flex space-x-8">
+                        <a href="{% url 'core:index' %}" class="top-nav-item">首页</a>
                         <a href="#" class="top-nav-item">仪表盘</a>
                         <a href="#" class="top-nav-item">用药管理</a>
                         <a href="#" class="top-nav-item">库存管理</a>
@@ -86,31 +87,47 @@
                 
                 <!-- 用户信息和操作 -->
                 <div class="flex items-center">
-                    <button type="button" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative">
+                    <button type="button" id="notification-btn" class="p-1 rounded-full text-gray-500 hover:text-primary hover:bg-gray-100 focus:outline-none relative hidden">
                         <i class="fa fa-bell text-xl"></i>
                         <span class="absolute top-0 right-0 h-2 w-2 bg-danger rounded-full"></span>
                     </button>
-                    <div class="ml-3 relative">
-                        <div>
-                            <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
-                                <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
-                                <span class="ml-2 text-sm font-medium text-gray-700 md:block">管理员</span>
-                                <i class="fa fa-angle-down ml-1 text-gray-500"></i>
-                            </button>
-                        </div>
-                        <!-- 用户菜单 -->
-                        <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-user mr-2"></i>个人信息
-                            </a>
-                            <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                <i class="fa fa-cog mr-2"></i>账户设置
-                            </a>
-                            <div class="border-t border-gray-100 my-1"></div>
-                            <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100">
-                                <i class="fa fa-sign-out mr-2"></i>退出登录
+                    
+                    <!-- 登录状态切换区域 -->
+                    <div id="login-area" class="ml-3">
+                        <!-- 未登录状态 -->
+                        {% if not user.is_authenticated %}
+                        <div id="login-btn">
+                            <a href="{% url 'core:login' %}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors inline-block">
+                                登录
                             </a>
                         </div>
+                        {% else %}
+                        
+                        <!-- 已登录状态 -->
+                        <div id="user-area" class="hidden md:flex items-center space-x-4">
+                            <div class="relative">
+                                <button type="button" class="flex items-center max-w-xs rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" id="user-menu-button">
+                                    <img class="h-8 w-8 rounded-full object-cover" src="https://picsum.photos/id/64/200/200" alt="用户头像">
+                                    <span class="ml-2 text-sm font-medium text-gray-700 md:block" id="username">{{ user.username }}</span>
+                                    <i class="fa fa-angle-down ml-1 text-gray-500"></i>
+                                </button>
+                                
+                                <!-- 用户菜单 -->
+                                <div class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 py-1 z-50" id="user-menu">
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-user mr-2"></i>个人信息
+                                    </a>
+                                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <i class="fa fa-cog mr-2"></i>账户设置
+                                    </a>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <a href="{% url 'core:logout' %}" class="block px-4 py-2 text-sm text-danger hover:bg-gray-100" id="logout-btn">
+                                        <i class="fa fa-sign-out mr-2"></i>退出登录
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -128,10 +145,11 @@
                 
                 <!-- 侧边栏菜单 - 根据角色动态显示 -->
                 <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
                     <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         系统管理
                     </div>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'core:user_list' %}" class="sidebar-link">
                         <i class="fa fa-user-circle"></i>
                         <span>用户管理</span>
                     </a>
@@ -143,6 +161,8 @@
                         <i class="fa fa-building"></i>
                         <span>药企管理</span>
                     </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药品管理
                     </div>
@@ -162,24 +182,8 @@
                         <i class="fa fa-money"></i>
                         <span>销售管理</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-bar-chart"></i>
-                        <span>数据统计</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        医疗服务
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-stethoscope"></i>
-                        <span>患者管理</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <span>电子处方</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>用药记录</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药企功能
                     </div>
@@ -187,44 +191,20 @@
                         <i class="fa fa-paper-plane"></i>
                         <span>供货信息发布</span>
                     </a>
-                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link">
                         <i class="fa fa-history"></i>
                         <span>供货记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-exchange"></i>
-                        <span>交易管理</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         患者服务
                     </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-user-md"></i>
-                        <span>我的医生</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
                         <i class="fa fa-medkit"></i>
                         <span>用药记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>处方查询</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        监管功能
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-eye"></i>
-                        <span>数据监控</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <span>审查报告</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-search"></i>
-                        <span>合规检查</span>
-                    </a>
+                    {% endif %}
                 </nav>
                 
                 <!-- 侧边栏底部 -->

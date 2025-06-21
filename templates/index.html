@@ -147,10 +147,11 @@
                 
                 <!-- 侧边栏菜单 - 根据角色动态显示 -->
                 <nav class="flex-1 overflow-y-auto py-4">
+                    {% if user.role == 'system_admin' %}
                     <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         系统管理
                     </div>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'core:user_list' %}" class="sidebar-link">
                         <i class="fa fa-user-circle"></i>
                         <span>用户管理</span>
                     </a>
@@ -162,6 +163,8 @@
                         <i class="fa fa-building"></i>
                         <span>药企管理</span>
                     </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'drug_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药品管理
                     </div>
@@ -181,24 +184,8 @@
                         <i class="fa fa-money"></i>
                         <span>销售管理</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-bar-chart"></i>
-                        <span>数据统计</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        医疗服务
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-stethoscope"></i>
-                        <span>患者管理</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <span>电子处方</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>用药记录</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'pharma_admin' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         药企功能
                     </div>
@@ -206,44 +193,20 @@
                         <i class="fa fa-paper-plane"></i>
                         <span>供货信息发布</span>
                     </a>
-                    <a href="{% url 'supply:supply_list' %}" class="sidebar-link">
+                    <a href="{% url 'transaction:supply_records' %}" class="sidebar-link">
                         <i class="fa fa-history"></i>
                         <span>供货记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-exchange"></i>
-                        <span>交易管理</span>
-                    </a>
+                    {% endif %}
+                    {% if user.role == 'system_admin' or user.role == 'patient' %}
                     <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                         患者服务
                     </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-user-md"></i>
-                        <span>我的医生</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
+                    <a href="{% url 'transaction:drug_use_records' %}" class="sidebar-link">
                         <i class="fa fa-medkit"></i>
                         <span>用药记录</span>
                     </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-text-o"></i>
-                        <span>处方查询</span>
-                    </a>
-                    <div class="px-4 py-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        监管功能
-                    </div>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-eye"></i>
-                        <span>数据监控</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-file-pdf-o"></i>
-                        <span>审查报告</span>
-                    </a>
-                    <a href="#" class="sidebar-link">
-                        <i class="fa fa-search"></i>
-                        <span>合规检查</span>
-                    </a>
+                    {% endif %}
                 </nav>
                 
                 <!-- 侧边栏底部 -->
@@ -274,7 +237,7 @@
                                 这是一个专为医疗行业设计的综合管理平台，帮助医疗机构、药企和监管部门高效管理药品流通和医疗服务。
                             </p>
                             <div class="flex flex-wrap gap-3">
-                                <a href="#" class="px-6 py-3 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all flex items-center">
+                                <a href="{% url 'core:login' %}" class="px-6 py-3 bg-primary text-white rounded-lg shadow hover:bg-primary/90 transition-all flex items-center">
                                     <i class="fa fa-rocket mr-2"></i>开始使用
                                 </a>
                                 <a href="#" class="px-6 py-3 bg-white text-primary border border-primary rounded-lg shadow hover:bg-primary/5 transition-all flex items-center">
@@ -355,51 +318,7 @@
                     <div class="bg-white rounded-xl shadow-sm p-6">
                         <h3 class="text-lg font-semibold mb-6">最近活动</h3>
                         <div class="space-y-4">
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <i class="fa fa-user-plus text-primary"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium">创建了新用户</p>
-                                    <p class="text-xs text-gray-500">管理员 · 2小时前</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
-                                    <i class="fa fa-check-circle text-success"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium">完成了药品入库</p>
-                                    <p class="text-xs text-gray-500">张三 · 5小时前</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center">
-                                    <i class="fa fa-exclamation-triangle text-warning"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium">3种药品库存不足</p>
-                                    <p class="text-xs text-gray-500">系统 · 昨天</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
-                                    <i class="fa fa-file-text-o text-secondary"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium">生成了月度报告</p>
-                                    <p class="text-xs text-gray-500">李四 · 昨天</p>
-                                </div>
-                            </div>
-                            <div class="flex items-start">
-                                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center">
-                                    <i class="fa fa-times-circle text-danger"></i>
-                                </div>
-                                <div class="ml-3">
-                                    <p class="text-sm font-medium">拒绝了进货申请</p>
-                                    <p class="text-xs text-gray-500">王五 · 3天前</p>
-                                </div>
-                            </div>
+                        
                         </div>
                         <div class="mt-6 text-center">
                             <a href="#" class="text-primary hover:text-primary/80 text-sm font-medium">查看全部活动</a>

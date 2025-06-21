@@ -1,100 +1,227 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse
-from django.contrib import messages
-from django.urls import reverse
 from datetime import datetime
-from .models import Purchase, Sale
-from hospital.models import DrugAdmin, Hospital, Patient  # 假设DrugAdmin在hospital应用中
-from supply.models import Drug, Pharma  # 假设SupplyDrug在supply应用中
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-# 示例数据
-purchase_detail_data = {
-    'P2023001': {
-        'id': 'P2023001',
-        'drug_name': '阿司匹林',
-        'specification': '100mg*30片',
-        'quantity': 1000,
-        'unit_price': 12.0,
-        'total_amount': 12000.0,
-        'supplier': '健康药业',
-        'supplier_contact': '张经理',
-        'supplier_phone': '13800138001',
-        'date': '2023-05-15',
-        'status': '已审核',
-        'approve_date': '2023-05-16',
-        'approve_by': '王审核员',
-        'receive_date': None,
-        'receive_by': None,
-        'notes': '常规进货，用于补充库存',
-        'items': [
-            {'drug_id': 'D001', 'name': '阿司匹林', 'specification': '100mg*30片', 'quantity': 1000, 'unit_price': 12.0, 'amount': 12000.0},
-        ]
-    },
-    'P2023002': {
-        'id': 'P2023002',
-        'drug_name': '布洛芬',
-        'specification': '0.3g*20片',
-        'quantity': 800,
-        'unit_price': 10.0,
-        'total_amount': 8000.0,
-        'supplier': '康泰制药',
-        'supplier_contact': '李经理',
-        'supplier_phone': '13900139001',
-        'date': '2023-05-16',
-        'status': '待审核',
-        'approve_date': None,
-        'approve_by': None,
-        'receive_date': None,
-        'receive_by': None,
-        'notes': '紧急进货，库存不足',
-        'items': [
-            {'drug_id': 'D002', 'name': '布洛芬', 'specification': '0.3g*20片', 'quantity': 800, 'unit_price': 10.0, 'amount': 8000.0},
-        ]
-    },
-    'P2023003': {
-        'id': 'P2023003',
-        'drug_name': '阿莫西林',
-        'specification': '0.25g*24粒',
-        'quantity': 1500,
-        'unit_price': 8.0,
-        'total_amount': 12000.0,
-        'supplier': '好医生药业',
-        'supplier_contact': '赵经理',
-        'supplier_phone': '13700137001',
-        'date': '2023-05-18',
-        'status': '已入库',
-        'approve_date': '2023-05-19',
-        'approve_by': '王审核员',
-        'receive_date': '2023-05-20',
-        'receive_by': '李管理员',
-        'notes': '季度批量进货，享受折扣',
-        'items': [
-            {'drug_id': 'D003', 'name': '阿莫西林', 'specification': '0.25g*24粒', 'quantity': 1500, 'unit_price': 8.0, 'amount': 12000.0},
-        ]
+from django.core.paginator import Paginator
+from django.db.models import Count, F, Sum
+from django.db.models.functions import TruncMonth
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from hospital.models import Doctor, DrugAdmin, Hospital, Patient
+from supply.models import Drug, Pharma
+from transaction.decorators import role_required
+from .models import Purchase, Sale
+
+@login_required
+@role_required(['system_admin', 'pharma_admin'])
+def supply_records(request):
+    # 获取当前时间相关日期范围
+    now = timezone.now()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    end_of_month = (start_of_month + timezone.timedelta(days=32)).replace(day=1) - timezone.timedelta(days=1)
+    
+    # 计算上月同期范围
+    last_month_start = (start_of_month - timezone.timedelta(days=1)).replace(day=1)
+    last_month_end = start_of_month - timezone.timedelta(seconds=1)
+    
+    # 获取筛选参数
+    hospital_id = request.GET.get('hospital')
+    purchase_id = request.GET.get('purchase_id')
+    drug_name = request.GET.get('drug_name')
+    status = request.GET.get('status')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    ordering = request.GET.get('ordering', '-create_time')  # 默认按创建时间降序
+    
+    # 基础查询集（使用select_related减少数据库查询）
+    supplies = Purchase.objects.select_related('hospital', 'drug')
+    
+    # 应用筛选条件
+    if hospital_id:
+        supplies = supplies.filter(hospital_id=hospital_id)
+    
+    if purchase_id:
+        supplies = supplies.filter(purchase_id__icontains=purchase_id)
+    
+    if drug_name:
+        supplies = supplies.filter(drug__name__icontains=drug_name)
+    
+    if status:
+        # 转换为中文状态
+        status_mapping = {
+            'pending': '待审核',
+            'approved': '已审核',
+            'received': '已入库',
+            'rejected': '已拒绝',
+        }
+        if status in status_mapping:
+            supplies = supplies.filter(status=status_mapping[status])
+    
+    if start_date and end_date:
+        supplies = supplies.filter(create_time__range=[start_date, end_date])
+    elif start_date:
+        supplies = supplies.filter(create_time__gte=start_date)
+    elif end_date:
+        supplies = supplies.filter(create_time__lte=end_date)
+    
+    # 月度供货数据（最近12个月）
+    monthly_supplies = supplies.annotate(month=TruncMonth('create_time')).values('month').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    ).order_by('month')[:12]
+
+    # 按医院分组的供货数据，累积所有日期的总金额
+    supplies_by_hospital = Purchase.objects.values('hospital__name').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    )
+
+    # 排序
+    supplies = supplies.order_by(ordering)
+    
+    # 计算统计数据（基于筛选后的数据集）
+    # 本月供货单数量
+    this_month_supplies = supplies.filter(
+        create_time__range=[start_of_month, end_of_month]
+    )
+    supply_count = this_month_supplies.count()
+    
+    # 上月供货单数量
+    last_month_supplies = supplies.filter(
+        create_time__range=[last_month_start, last_month_end]
+    )
+    last_supply_count = last_month_supplies.count()
+    
+    # 计算供货单数量同比增长率
+    supply_count_growth = 0
+    if last_supply_count > 0:
+        supply_count_growth = ((supply_count - last_supply_count) / last_supply_count) * 100
+    
+    # 本月供货金额
+    this_month_amount = this_month_supplies.aggregate(
+        total=Sum(F('quantity') * F('price'))
+    )['total'] or 0
+    
+    # 上月供货金额
+    last_month_amount = last_month_supplies.aggregate(
+        total=Sum(F('quantity') * F('price'))
+    )['total'] or 0
+    
+    # 计算供货金额同比增长率
+    amount_growth = 0
+    if last_month_amount > 0:
+        amount_growth = ((this_month_amount - last_month_amount) / last_month_amount) * 100
+    
+    # 待审核订单数量
+    pending_orders = Purchase.objects.filter(status='待审核').count()
+    
+    # 合作医院数量
+    total_hospitals = Purchase.objects.values('hospital').annotate(Count('hospital')).count()
+    
+    # 本月新增医院（假设Hospital模型有founded字段）
+    new_hospitals_this_month = Hospital.objects.filter(
+        founded__range=[start_of_month, end_of_month]
+    ).count()
+
+    # 分页（每页显示10条记录）
+    paginator = Paginator(supplies, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 获取医院列表，用于筛选下拉框
+    hospitals = Hospital.objects.all()
+    
+    context = {
+        'supplies': page_obj,
+        'hospitals': hospitals,
+        'supply_count': supply_count,
+        'supply_count_growth': round(supply_count_growth, 1),
+        'this_month_amount': this_month_amount,
+        'amount_growth': round(amount_growth, 1),
+        'pending_orders': pending_orders,
+        'total_hospitals': total_hospitals,
+        'new_hospitals_this_month': new_hospitals_this_month,
+        'monthly_supplies': monthly_supplies,
+        'supplies_by_hospital': supplies_by_hospital,
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
     }
-}
 
-purchase_list_data = [
-    {'id': 'P2023001', 'drug_name': '阿司匹林', 'quantity': 1000, 'supplier': '健康药业', 'date': '2023-05-15', 'status': '已审核'},
-    {'id': 'P2023002', 'drug_name': '布洛芬', 'quantity': 800, 'supplier': '康泰制药', 'date': '2023-05-16', 'status': '待审核'},
-]
+    return render(request, 'transaction/supply_records.html', context)
 
-sale_list_data = [
-    {'id': 'S2023001', 'drug_name': '阿司匹林', 'quantity': 100, 'customer': '中心医院', 'date': '2023-05-20', 'total': 1200},
-    {'id': 'S2023002', 'drug_name': '布洛芬', 'quantity': 50, 'customer': '第一人民医院', 'date': '2023-05-21', 'total': 800},
-]
-
-prescription_data = [
-    {'id': 'R2023001', 'patient': '张三', 'drug_name': '阿莫西林', 'dosage': '500mg', 'frequency': '每日3次', 'doctor': '李医生', 'date': '2023-05-10'},
-    {'id': 'R2023002', 'patient': '李四', 'drug_name': '布洛芬', 'dosage': '200mg', 'frequency': '每日2次', 'doctor': '王医生', 'date': '2023-05-12'},
-]
 
 @login_required
+@role_required(['system_admin', 'patient'])
+def drug_use_records(request):
+    # 获取筛选参数
+    name = request.GET.get('name', '')
+    drug_name = request.GET.get('drug_name', '')
+    start_date = request.GET.get('start_date', '')
+    end_date = request.GET.get('end_date', '')
+    ordering = request.GET.get('ordering', '-create_time')  # 默认按最新用药时间排序
+    patient_name = request.user.name
+    
+    # 构建查询集
+    medication_records = Sale.objects.all()
+    
+    # 应用筛选条件
+    if drug_name:
+        medication_records = medication_records.filter(drug__name__icontains=drug_name)
+    
+    if start_date and end_date:
+        medication_records = medication_records.filter(
+            create_time__range=[start_date, end_date]
+        )
+    
+    if patient_name:
+        medication_records = medication_records.filter(
+            patient__name__icontains=patient_name
+        )
+
+    # 应用排序
+    if ordering in ['create_time', '-create_time']:
+        medication_records = medication_records.order_by(ordering)
+    
+    # 准备上下文数据
+    context = {
+        'medication_records': medication_records,
+        'request': request  # 将request对象传递给模板，用于保留筛选参数
+    }
+    
+    return render(request, 'transaction/drug_use_records.html', context)
+
+@login_required
+@role_required(['system_admin', 'drug_admin'])
 def drug_list(request):
+    # 获取筛选参数
+    approval_number = request.GET.get('approval_number')
+    drug = request.GET.get('drug_name')
+    status = request.GET.get('status')
 
-    return render(request, 'transaction/drug_list.html', {'drugs': Drug.objects.all()})
+    # 基础查询集
+    drugs = Drug.objects.all()
+
+    # 应用筛选条件
+    if approval_number:
+        drugs = drugs.filter(approval_number__icontains=approval_number)
+    if drug:
+        drugs = drugs.filter(name__icontains=drug)
+    if status:
+        drugs = drugs.filter(status=status)
+
+
+    # 分页（每页显示10条记录）
+    paginator = Paginator(drugs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'drugs': page_obj,
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
+    }
+
+    return render(request, 'transaction/drug_list.html', context)
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def drug_create(request):
     if request.method == 'POST':
         # 处理表单提交
@@ -129,10 +256,12 @@ def drug_create(request):
     return render(request, 'transaction/drug_create.html', {'action': '创建'})
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def drug_detail(request, drug_id):
     return render(request, 'transaction/drug_detail.html', {'drug': Drug.objects.get(id=drug_id)})
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def drug_update(request, drug_id):
     """更新药品信息的简化视图函数"""
     drug = get_object_or_404(Drug, id=drug_id)
@@ -171,14 +300,10 @@ def drug_update(request, drug_id):
     # 首次加载时显示表单
     return render(request, 'transaction/drug_update.html', {'drug': drug})
 
-from django.shortcuts import render
-from .models import Purchase
-from django.db.models import F, Sum, Count
-from django.utils import timezone
-from supply.models import Pharma  # 导入药企模型
-
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def purchase_list(request):
+    # 获取当前时间相关日期范围
     now = timezone.now()
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     end_of_month = (start_of_month + timezone.timedelta(days=32)).replace(day=1) - timezone.timedelta(days=1)
@@ -186,18 +311,70 @@ def purchase_list(request):
     # 计算上月同期范围
     last_month_start = (start_of_month - timezone.timedelta(days=1)).replace(day=1)
     last_month_end = start_of_month - timezone.timedelta(seconds=1)
+    if request.user.role == 'drug_admin':
+        drug_admin = DrugAdmin.objects.get(user=request.user)
+        hospital_id = drug_admin.hospital.id
+    # 获取筛选参数
+    hospital_id = request.GET.get('hospital')
+    purchase_id = request.GET.get('purchase_id')
+    drug_name = request.GET.get('drug_name')
+    supplier_id = request.GET.get('supplier')
+    status = request.GET.get('status')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    ordering = request.GET.get('ordering', '-create_time')  # 默认按创建时间降序
     
+    # 基础查询集（使用select_related减少数据库查询）
+    purchases = Purchase.objects.select_related('hospital', 'drug', 'pharma')
+    
+    # 应用筛选条件
+    if hospital_id:
+        purchases = purchases.filter(hospital_id=hospital_id)
+    
+    if purchase_id:
+        purchases = purchases.filter(purchase_id__icontains=purchase_id)
+    
+    if drug_name:
+        purchases = purchases.filter(drug__name__icontains=drug_name)
+    
+    if supplier_id:
+        purchases = purchases.filter(pharma_id=supplier_id)
+    
+    if status:
+        purchases = purchases.filter(status=status)
+    
+    if start_date and end_date:
+        purchases = purchases.filter(create_time__range=[start_date, end_date])
+    elif start_date:
+        purchases = purchases.filter(create_time__gte=start_date)
+    elif end_date:
+        purchases = purchases.filter(create_time__lte=end_date)
+    
+    # 月度进货数据（最近12个月）
+    monthly_purchases = purchases.annotate(month=TruncMonth('create_time')).values('month').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    ).order_by('month')[:12]
+
+    # 按医院分组的进货数据，累积所有日期的总金额
+    purchases_by_hospital = Purchase.objects.values('hospital__name').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    )
+
+    # 排序
+    purchases = purchases.order_by(ordering)
+    
+    # 计算统计数据（基于筛选后的数据集）
     # 本月进货单数量（已审核）
-    this_month_orders = Purchase.objects.filter(
+    this_month_orders = purchases.filter(
         create_time__range=[start_of_month, end_of_month],
-        status='已审核'
+        status__in=['已审核', '已入库']  # 假设已入库的订单也算在内
     )
     order_count = this_month_orders.count()
     
     # 上月进货单数量
-    last_month_orders = Purchase.objects.filter(
+    last_month_orders = purchases.filter(
         create_time__range=[last_month_start, last_month_end],
-        status='已审核'
+        status__in=['已审核', '已入库']  # 假设已入库的订单也算在内
     )
     last_order_count = last_month_orders.count()
     
@@ -216,30 +393,40 @@ def purchase_list(request):
         total=Sum(F('quantity') * F('price'))
     )['total'] or 0
     
-    # 上月进货金额
-    last_month_amount = last_month_orders.aggregate(Sum('price'))['price__sum'] or 0
-    
     # 计算进货金额同比增长率
     amount_growth = 0
     if last_month_amount > 0:
         amount_growth = ((this_month_amount - last_month_amount) / last_month_amount) * 100
     
-    # 待审核订单数量
+    # 待审核订单数量（基于所有数据，不应用筛选）
     pending_orders = Purchase.objects.filter(status='待审核').count()
     
-    # 供应商数量（从采购记录中统计不同药企数量）
+    # 供应商数量（从所有采购记录中统计不同药企数量）
     total_suppliers = Purchase.objects.values('pharma').annotate(Count('pharma')).count()
     
     # 本月新增供应商（假设Pharma模型有updated_at字段）
     new_suppliers_this_month = Pharma.objects.filter(
         updated_at__range=[start_of_month, end_of_month]
     ).count()
-    
-    # 获取所有采购记录（按创建时间降序排列）
-    purchases = Purchase.objects.all().order_by('-create_time')
 
+    # 分页（每页显示10条记录）
+    paginator = Paginator(purchases, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    # 获取医院和药企列表，用于筛选下拉框
+    if request.user.role == 'drug_admin':
+        drug_admin = DrugAdmin.objects.get(user=request.user)
+        hospital = drug_admin.hospital
+        hospitals = [hospital]
+    else:
+        hospitals = Hospital.objects.all()
+    pharmas = Pharma.objects.all()
+    
     context = {
-        'purchases': purchases,
+        'purchases': page_obj,
+        'hospitals': hospitals,
+        'pharmas': pharmas,
         'order_count': order_count,
         'order_count_growth': round(order_count_growth, 1),
         'this_month_amount': this_month_amount,
@@ -247,11 +434,15 @@ def purchase_list(request):
         'pending_orders': pending_orders,
         'total_suppliers': total_suppliers,
         'new_suppliers_this_month': new_suppliers_this_month,
+        'monthly_purchases': monthly_purchases,
+        'purchases_by_hospital': purchases_by_hospital,
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
     }
 
     return render(request, 'transaction/purchase_list.html', context)
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def purchase_create(request):
     if request.method == 'POST':
         # 获取表单数据
@@ -260,11 +451,27 @@ def purchase_create(request):
         quantity = request.POST.get('quantity')
         price = request.POST.get('price')
         status = request.POST.get('status')
-        print(status)
         admin_id = request.POST.get('admin')
         pharma_id = request.POST.get('pharma')  # 新增药企字段
         hospital_id = request.POST.get('hospital')  # 新增医院字段
-        create_time = request.POST.get('purchase_date')  # 新增进货日期字段
+        purchase_date_str = request.POST.get('purchase_date')  # 新增进货日期字段
+        
+        if purchase_date_str:
+            # 将字符串转换为日期对象
+            purchase_date = datetime.strptime(purchase_date_str, '%Y-%m-%d')
+            
+            # 获取当前时间的时分秒
+            now = timezone.now()
+            current_time = now.time()
+            
+            # 组合日期和当前时分秒
+            create_time = datetime.combine(purchase_date, current_time)
+            
+            # 若使用时区，需将时间转换为带时区的datetime对象
+            create_time = timezone.make_aware(create_time, timezone=now.tzinfo)
+        else:
+            # 未选择日期时，使用当前完整时间
+            create_time = timezone.now()
 
         # 获取下拉菜单选项
         drugs = Drug.objects.all()
@@ -299,7 +506,7 @@ def purchase_create(request):
                 quantity=quantity,
                 price=price,
                 admin=admin,
-                create_time=create_time or datetime.now(),
+                create_time=create_time,
                 status=status,
             )
             
@@ -308,7 +515,6 @@ def purchase_create(request):
         except Drug.DoesNotExist:
             error_message = '选择的药品不存在'
             messages.error(request, error_message)
-            print(error_message)
             return render(request, 'transaction/purchase_create.html', {
                 'drugs': drugs,
                 'admins': admins,
@@ -320,7 +526,6 @@ def purchase_create(request):
         except DrugAdmin.DoesNotExist:
             error_message = '选择的药品管理员不存在'
             messages.error(request, error_message)
-            print(error_message)
             return render(request, 'transaction/purchase_create.html', {
                 'drugs': drugs,
                 'admins': admins,
@@ -332,7 +537,6 @@ def purchase_create(request):
         except Exception as e:
             error_message = f'创建进货单失败: {str(e)}'
             messages.error(request, error_message)
-            print(error_message)
             return render(request, 'transaction/purchase_create.html', {
                 'drugs': drugs,
                 'admins': admins,
@@ -363,86 +567,140 @@ def purchase_create(request):
     })
 
 @login_required
-def purchase_update(request, purchase_id):
-    purchase = next((p for p in purchase_list_data if p['id'] == purchase_id), None)
-    if request.method == 'POST':
-        messages.success(request, '进货单更新成功')
-        return redirect('transaction:purchase_list')
-    return render(request, 'transaction/purchase_form.html', {'action': '更新', 'purchase': purchase})
-
-@login_required
-def purchase_approve(request, purchase_id):
-    purchase = next((p for p in purchase_list_data if p['id'] == purchase_id), None)
-    if purchase:
-        purchase['status'] = '已审核'
-        messages.success(request, '进货单审核成功')
-    return redirect('transaction:purchase_list')
-
-from django.utils import timezone
-from django.db.models import Sum
-
-@login_required
+@role_required(['system_admin', 'drug_admin'])
 def sale_list(request):
+    # 获取当前时间相关日期范围
     now = timezone.now()
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     end_of_month = (start_of_month + timezone.timedelta(days=32)).replace(day=1) - timezone.timedelta(days=1)
-    
+
     # 计算上月同期范围
     last_month_start = (start_of_month - timezone.timedelta(days=1)).replace(day=1)
     last_month_end = start_of_month - timezone.timedelta(seconds=1)
+
+    if request.user.role == 'drug_admin':
+        drug_admin = DrugAdmin.objects.get(user=request.user)
+        hospital_id = drug_admin.hospital.id
+    # 获取筛选参数
+    hospital_id = request.GET.get('hospital')
+    sale_id = request.GET.get('sale_id')
+    drug_name = request.GET.get('drug_name')
+    status = request.GET.get('status')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    ordering = request.GET.get('ordering', '-create_time')  # 默认按创建时间降序
+
+    # 基础查询集（使用select_related减少数据库查询）
+    sales = Sale.objects.select_related('hospital', 'drug')
+
+    # 应用筛选条件
+    if hospital_id:
+        try:
+            sales = sales.filter(hospital_id=int(hospital_id))
+        except ValueError:
+            pass
+    if sale_id:
+        sales = sales.filter(sale_id__icontains=sale_id)
+    if drug_name:
+        sales = sales.filter(drug__name__icontains=drug_name)
+    if status:
+        sales = sales.filter(status=status)
+    if start_date and end_date:
+        try:
+            sales = sales.filter(create_time__range=[start_date, end_date])
+        except ValueError:
+            pass
+    elif start_date:
+        try:
+            sales = sales.filter(create_time__gte=start_date)
+        except ValueError:
+            pass
+    elif end_date:
+        try:
+            sales = sales.filter(create_time__lte=end_date)
+        except ValueError:
+            pass
+
+    # 月度销售数据（最近12个月）
+    monthly_sales = sales.annotate(month=TruncMonth('create_time')).values('month').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    ).order_by('month')[:12]
+
+    # 按医院分组的销售数据
+    sales_by_hospital = sales.values('hospital__name').annotate(
+        amount=Sum(F('quantity') * F('price'))
+    )
     
-    # 本月销售数据
-    this_month_sales = Sale.objects.filter(create_time__range=[start_of_month, end_of_month])
-    total_sales_this_month = this_month_sales.aggregate(
-        total=Sum(F('quantity') * F('price'))
-    )['total'] or 0
-    
-    # 上月销售数据
-    last_month_sales = Sale.objects.filter(create_time__range=[last_month_start, last_month_end])
-    total_sales_last_month = last_month_sales.aggregate(
-        total=Sum(F('quantity') * F('price'))
-    )['total'] or 0
-    
+    # 排序
+    sales = sales.order_by(ordering)
+
+    def get_sales_in_range(start, end):
+        return sales.filter(
+            create_time__range=[start, end],
+            status__in=['已支付', '已取药']
+        )
+
+    this_month_sales = get_sales_in_range(start_of_month, end_of_month)
+    last_month_sales = get_sales_in_range(last_month_start, last_month_end)
+
+    # 计算销售总额
+    def calculate_total_sales(sales_queryset):
+        return sales_queryset.aggregate(
+            total=Sum(F('quantity') * F('price'))
+        )['total'] or 0
+
+    total_sales_this_month = calculate_total_sales(this_month_sales)
+    total_sales_last_month = calculate_total_sales(last_month_sales)
+
     # 计算销售总额增长率
     sales_growth_rate = 0
     if total_sales_last_month > 0:
         sales_growth_rate = ((total_sales_this_month - total_sales_last_month) / total_sales_last_month) * 100
-    
+
     # 统计每种药品的总销量
-    drug_sales = Sale.objects.values('drug').annotate(total_quantity=Sum('quantity'))
-    
+    def calculate_drug_sales(sales_queryset):
+        return sales_queryset.values('drug').annotate(total_quantity=Sum('quantity'))
+
+    drug_sales = calculate_drug_sales(sales)
+    last_month_drug_sales = calculate_drug_sales(last_month_sales)
+
     # 畅销药品（销量>100）
     popular_drug_count = drug_sales.filter(total_quantity__gt=100).count()
-    
+    last_month_popular_drug_count = last_month_drug_sales.filter(total_quantity__gt=100).count()
+
     # 滞销药品（销量<10）
     unpopular_drug_count = drug_sales.filter(total_quantity__lt=10).count()
-    
+    last_month_unpopular_drug_count = last_month_drug_sales.filter(total_quantity__lt=10).count()
+
     # 销售订单数量及增长率
     sale_order_count = this_month_sales.count()
     sale_order_count_last_month = last_month_sales.count()
-    
-    order_count_growth_rate = 0
-    if sale_order_count_last_month > 0:
-        order_count_growth_rate = ((sale_order_count - sale_order_count_last_month) / sale_order_count_last_month) * 100
-    
-    # 畅销药品数量增长率
-    # 先获取上月畅销药品数量
-    last_month_drug_sales = last_month_sales.values('drug').annotate(total_quantity=Sum('quantity'))
-    last_month_popular_drug_count = last_month_drug_sales.filter(total_quantity__gt=100).count()
-    
-    popular_drug_growth_rate = 0
-    if last_month_popular_drug_count > 0:
-        popular_drug_growth_rate = ((popular_drug_count - last_month_popular_drug_count) / last_month_popular_drug_count) * 100
-    
-    # 滞销药品数量增长率
-    last_month_unpopular_drug_count = last_month_drug_sales.filter(total_quantity__lt=10).count()
-    
-    unpopular_drug_growth_rate = 0
-    if last_month_unpopular_drug_count > 0:
-        unpopular_drug_growth_rate = ((unpopular_drug_count - last_month_unpopular_drug_count) / last_month_unpopular_drug_count) * 100
-    
+
+    def calculate_growth_rate(current, previous):
+        if previous > 0:
+            return ((current - previous) / previous) * 100
+        return 0
+
+    order_count_growth_rate = calculate_growth_rate(sale_order_count, sale_order_count_last_month)
+    popular_drug_growth_rate = calculate_growth_rate(popular_drug_count, last_month_popular_drug_count)
+    unpopular_drug_growth_rate = calculate_growth_rate(unpopular_drug_count, last_month_unpopular_drug_count)
+
+    # 分页（每页显示10条记录）
+    paginator = Paginator(sales, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # 获取医院列表，用于筛选下拉框
+    if request.user.role == 'drug_admin':
+        drug_admin = DrugAdmin.objects.get(user=request.user)
+        hospital = drug_admin.hospital
+        hospitals = [hospital]
+    else:
+        hospitals = Hospital.objects.all()
+
     context = {
-        'sales': this_month_sales,
+        'sales': page_obj,
+        'hospitals': hospitals,
         'total_sales_this_month': total_sales_this_month,
         'popular_drug_count': popular_drug_count,
         'unpopular_drug_count': unpopular_drug_count,
@@ -451,11 +709,15 @@ def sale_list(request):
         'order_count_growth_rate': round(order_count_growth_rate, 1),
         'popular_drug_growth_rate': round(popular_drug_growth_rate, 1),
         'unpopular_drug_growth_rate': round(unpopular_drug_growth_rate, 1),
+        'monthly_sales': monthly_sales,
+        'sales_by_hospital': sales_by_hospital,
+        'filters': request.GET.dict(),  # 传递筛选参数用于模板
     }
-    
+
     return render(request, 'transaction/sale_list.html', context)
 
 @login_required
+@role_required(['system_admin', 'drug_admin'])
 def sale_create(request):
     if request.method == 'POST':
         # 获取表单数据
@@ -467,7 +729,24 @@ def sale_create(request):
         price = request.POST.get('price')
         status = request.POST.get('status')
         admin_id = request.POST.get('admin')
-        create_time = request.POST.get('sale_date')  # 新增销售日期字段
+        sale_date_str = request.POST.get('sale_date')  # 新增销售日期字段
+        
+        if sale_date_str:
+            # 将字符串转换为日期对象
+            sale_date = datetime.strptime(sale_date_str, '%Y-%m-%d')
+            
+            # 获取当前时间的时分秒
+            now = timezone.now()
+            current_time = now.time()
+            
+            # 组合日期和当前时分秒
+            create_time = datetime.combine(sale_date, current_time)
+            
+            # 若使用时区，需将时间转换为带时区的datetime对象
+            create_time = timezone.make_aware(create_time, timezone=now.tzinfo)
+        else:
+            # 未选择日期时，使用当前完整时间
+            create_time = timezone.now()
 
         # 验证必要字段
         if not sale_id or not drug_id or not hospital_id or not patient_id or not quantity or not price or not admin_id:
@@ -491,7 +770,7 @@ def sale_create(request):
                 quantity=quantity,
                 price=price,
                 status=status,
-                create_time=create_time or datetime.now(),
+                create_time=create_time,
                 admin=admin,
             )
 
@@ -548,111 +827,31 @@ def sale_create(request):
     })
 
 @login_required
-def sale_stats(request):
-    # 模拟销售统计数据
-    stats = {
-        'total_sales': 125000,
-        'top_drugs': [
-            {'name': '阿司匹林', 'quantity': 1500, 'amount': 30000},
-            {'name': '布洛芬', 'quantity': 1200, 'amount': 24000},
-            {'name': '阿莫西林', 'quantity': 1000, 'amount': 20000},
-        ],
-        'monthly_trend': [
-            {'month': '1月', 'amount': 15000},
-            {'month': '2月', 'amount': 18000},
-            {'month': '3月', 'amount': 22000},
-            {'month': '4月', 'amount': 25000},
-            {'month': '5月', 'amount': 28000},
-        ]
-    }
-    return render(request, 'transaction/sale_stats.html', {'stats': stats})
+@role_required(['system_admin', 'drug_admin'])
+def purchase_store(request, purchase_id):
+    purchase = get_object_or_404(Purchase, purchase_id=purchase_id)
+    # 这里添加入库逻辑，比如更新进货单状态为已入库
+    purchase.status = '已入库'
+    purchase.save()
+    return redirect('transaction:purchase_list')  # 重定向到进货单列表页面
 
-@login_required
-def prescription_list(request):
-    return render(request, 'transaction/prescription_list.html', {'prescriptions': prescription_data})
-
-@login_required
-def prescription_create(request):
-    if request.method == 'POST':
-        messages.success(request, '用药记录创建成功')
-        return redirect('transaction:prescription_list')
-    return render(request, 'transaction/prescription_form.html', {'action': '创建'})
-
-@login_required
-def prescription_patient(request):
-    if request.method == 'POST':
-        patient_name = request.POST.get('patient_name')
-        filtered_prescriptions = [p for p in prescription_data if p['patient'] == patient_name]
-        return render(request, 'transaction/prescription_patient.html', 
-                     {'prescriptions': filtered_prescriptions, 'patient_name': patient_name})
-    return render(request, 'transaction/prescription_patient.html')
-
-@login_required
-# 补充进货单详情视图
-def purchase_detail(request, purchase_id):
-    purchase = purchase_detail_data.get(purchase_id)
-    if not purchase:
-        messages.error(request, '进货单不存在')
-        return redirect('transaction:purchase_list')
-    
-    # 模拟操作权限（实际项目中应使用权限系统）
-    can_approve = purchase['status'] == '待审核'
-    can_receive = purchase['status'] == '已审核'
-    
-    return render(request, 'transaction/purchase_detail.html', {
-        'purchase': purchase,
-        'can_approve': can_approve,
-        'can_receive': can_receive
-    })
-
-@login_required
-# 补充进货单入库视图
-def purchase_receive(request, purchase_id):
-    purchase = purchase_detail_data.get(purchase_id)
-    if not purchase:
-        messages.error(request, '进货单不存在')
-        return redirect('transaction:purchase_list')
-    
-    if purchase['status'] != '已审核':
-        messages.error(request, '只有已审核的进货单才能入库')
-        return redirect('transaction:purchase_detail', purchase_id=purchase_id)
-    
-    if request.method == 'POST':
-        # 模拟入库操作
-        purchase['status'] = '已入库'
-        purchase['receive_date'] = datetime.now().strftime('%Y-%m-%d')
-        purchase['receive_by'] = request.user.username if request.user.is_authenticated else '系统'
-        
-        # 更新库存（模拟）
-        for item in purchase['items']:
-            drug = next((d for d in inventory_data if d['id'] == item['drug_id']), None)
-            if drug:
-                drug['quantity'] += item['quantity']
-                # 更新库存状态
-                if drug['quantity'] >= drug['alert_quantity'] and drug['quantity'] > 0:
-                    drug['status'] = '正常'
-        
-        messages.success(request, '进货单已成功入库，库存已更新')
-        return redirect('transaction:purchase_detail', purchase_id=purchase_id)
-    
-    return render(request, 'transaction/purchase_receive.html', {'purchase': purchase})
-
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-
-@csrf_exempt  # 仅用于开发测试，生产环境建议使用 CSRF 保护
 def approve_purchase(request, purchase_id):
     if request.method == 'POST':
-        purchase = get_object_or_404(Purchase, purchase_id=purchase_id)
-        if purchase.status == '待审核' or purchase.status == '已拒绝':
-            purchase.status = '已审核'
-            purchase.save()
-            return JsonResponse({'success': True})
-        else:
-            return JsonResponse({'success': False, 'error': '订单状态不是待审核'})
+        try:
+            purchase = get_object_or_404(Purchase, purchase_id=purchase_id)
+            if purchase.status == '待审核' or purchase.status == '已拒绝' or purchase.status == '已入库':
+                purchase.status = '已审核'
+                purchase.save()
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'success': False, 'error': '订单状态不是待审核'})
+        except ValueError as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': '未知错误'}, status=500)
+
     return JsonResponse({'success': False, 'error': '无效请求'})
 
-@csrf_exempt  # 仅用于开发，生产环境移除
 def reject_purchase(request, purchase_id):
     if request.method == 'POST':
         purchase = get_object_or_404(Purchase, purchase_id=purchase_id)
@@ -663,3 +862,72 @@ def reject_purchase(request, purchase_id):
         else:
             return JsonResponse({'success': False, 'error': '订单状态不是待审核'})
     return JsonResponse({'success': False, 'error': '无效请求'})
+
+@csrf_protect  # 使用Django的CSRF保护，而非csrf_exempt
+def store_purchase(request, purchase_id):
+    if request.method == 'POST':
+        purchase = get_object_or_404(Purchase, purchase_id=purchase_id)
+        if purchase.status == '已审核':
+            purchase.status = '已入库'
+            purchase.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': '订单未审核'})
+    return JsonResponse({'success': False, 'error': '无效请求'})
+
+def purchase_delete(request):
+    purchase_id = request.GET.get('purchase_id')
+    try:
+        purchase = Purchase.objects.get(purchase_id=purchase_id)
+        purchase.delete()
+        return JsonResponse({'success': True, 'message': '进货单删除成功'})
+    except Purchase.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '进货单不存在'})
+    except ValueError as e:
+        print(f"ValueError")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+
+@csrf_exempt
+def pay_sale(request, sale_id):
+    try:
+        sale = Sale.objects.get(sale_id=sale_id)
+        if sale.status == '待支付':
+            sale.status = '已支付'
+            sale.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': '该销售单状态不是待支付，无法进行支付操作。'})
+    except Sale.DoesNotExist:
+        return JsonResponse({'success': False, 'error': '未找到该销售单。'})
+
+@csrf_exempt
+def take_drug(request, sale_id):
+    try:
+        sale = Sale.objects.get(sale_id=sale_id)
+        if sale.status == '已支付':
+            sale.status = '已取药'
+            sale.save()
+            return JsonResponse({'success': True})
+        else:
+            return JsonResponse({'success': False, 'error': '该销售单状态不是已支付，无法进行取药操作。'})
+    except Sale.DoesNotExist:
+        return JsonResponse({'success': False, 'error': '未找到该销售单。'})
+    except ValueError as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': '未知错误'}, status=500)
+    
+def sale_delete(request):
+    sale_id = request.GET.get('sale_id')
+    try:
+        sale = Sale.objects.get(sale_id=sale_id)
+        sale.delete()
+        return JsonResponse({'success': True, 'message': '销售单删除成功'})
+    except Sale.DoesNotExist:
+        return JsonResponse({'success': False, 'message': '销售单不存在'})
+    except ValueError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})

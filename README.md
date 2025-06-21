@@ -1,137 +1,130 @@
-本 Django 框架基于 https://docs.djangoproject.com/zh-hans/5.2/intro/tutorial01/ 教程编写。
-以及视频教学 [Django 教程](https://www.bilibili.com/video/BV1NL41157ph)
+# 项目名称
 
-首先，输入命令创建项目
-```shell
-django-admin startproject database Yao-Duo-Duo
-```
+这是复旦大学数据库与实现[DATA130039A]的期末课程设计。“智药医典通” 是一个基于 Django 框架开发的药品供应与使用管理平台，面向药企、医院、医生、患者和政府监管部门，支持从药品生产到用药全生命周期的数据记录与管理。该系统结合国家“互联网+医疗”及“数据要素”发展战略，具有高实用性和推广潜力，适用于药品供应链管理、库存管理和监管审查。本 README 文件详细说明了开发环境的设置、数据库初始化流程、测试数据导入方法、项目运行步骤与使用方法，以及团队成员的分工情况。
 
-用指令运行项目
-```shell
-python manage.py runserver
-```
+## 开发环境
 
-创建应用
-```shell
-py manage.py startapp supply
-py manage.py startapp hospital
-py manage.py startapp transaction
-py manage.py startapp core
-``` 
+运行和开发本项目需要以下环境：
 
-注册应用
+- **操作系统**：Windows 11。
+- **编程语言**：
+  - Python 3.11.11（已确认）。
+  - JavaScript（Node.js 22.5.1 已安装，但当前无 npm 依赖，前端未初始化）。
 
-编写 URL 映射
+- **框架和库**：
+  - Django 4.2.5（Web 框架）。
+  - mysqlclient 2.2.3 和 PyMySQL 1.1.1（MySQL 数据库连接）。
+  - django-pandas 0.6.6、numpy 1.26.4、pandas 2.2.1（数据处理相关）。
+  - faker 37.4.0（随机数据生成）。
 
-编写视图函数
+- **数据库**：MySQL 8.0.41（已确认）。
+- **其他工具**：
+  - GitHub Desktop 用于提交与下载代码。
+  - Visual Studio Code（已确认，作为代码编辑器）。
+  - Python 虚拟环境（已确认，名为 `db`）
 
-### 
+请确保在继续之前安装并配置好上述工具。
 
-安装第三方模块
-```shell
-pip install mysqlclient
-```
+## 数据库初始化流程
 
-执行命令同步数据库
-```shell
-python manage.py makemigrations
-python manage.py migrate
-```
+按照以下步骤初始化数据库：
 
-要将智药医典通数据库的主要表划分为两到三部分，可以根据业务逻辑、功能模块或数据关联性进行分组。以下是分析和建议的操作步骤：
+按照以下步骤初始化 MySQL 数据库：
 
-### 分析
-数据库包含12个主要表和1个日志表，涉及药企、药品、医院、医生、患者、药品管理、库存、交易等功能。划分的依据可以是：
-1. **功能模块**：如药品管理、医院管理、交易记录。
-2. **数据关联性**：如哪些表之间有强外键关系或频繁联表查询。
-3. **业务场景**：如监管、医院内部管理、供应链。
+1. **安装 MySQL**：
+   - 已确认 MySQL 8.0.41 安装完成，可通过以下命令验证：
+     ```bash
+     mysql --version
+     ```
 
-根据表的功能和关联性，建议以下两种划分方式：
+2. **创建数据库**：
+   - 打开终端并运行：
+     ```bash
+     mysql -u root -p
+     ```
+   - 输入 MySQL 根用户密码后，创建数据库：
+     ```sql
+     CREATE DATABASE meme;
+     ```
 
----
+3. **设置**：
+   - 在 Django 的 `database\settings.py` 文件中配置数据库：
+     ```python
+     DATABASES = {
+         'default': {
+             'ENGINE': 'django.db.backends.mysql',
+             'NAME': 'meme',
+             'USER': 'root',
+             'PASSWORD': '你的密码',
+             'HOST': 'localhost',
+             'PORT': '3306',
+         }
+     }
+     ```
 
-### 方案一：按功能模块划分为三部分
-将表分为**药品供应链**、**医院与医疗管理**、**交易与记录**三个模块，逻辑清晰，适合分开管理或模块化开发。
 
-#### 1. 药品供应链模块
-包含与药品生产、供应、库存相关的表：
-- `pharma`（药企）
-- `drug`（药品）
-- `supply`（药品供应）
-- `inventory`（库存）
-- `warning_log`（库存预警日志）
+4. **运行数据库迁移**：
+   - 在项目根目录下，激活虚拟环境：
+     ```bash
+     conda activate db
+     ```
+   - 运行 Django 迁移命令以创建表结构：
+     ```bash
+     python manage.py makemigrations
+     python manage.py migrate
+     ```
 
-**理由**：这些表围绕药品的生产、供应和库存管理，数据流从药企到医院库存，适合供应链管理场景。
+## 测试数据导入方法
 
-#### 2. 医院与医疗管理模块
-包含与医院、医生、患者相关的表：
-- `hospital`（医院）
-- `doctor`（医生）
-- `patient`（患者）
-- `drug_admin`（药品管理员）
-- `doctor_hospital`（医生与医院管理关系）
+为了在开发或测试中填充数据库，运行以下命令导入测试数据：
 
-**理由**：这些表聚焦于医院内部的组织结构和人员管理，适合医院管理场景。
+- 确保一定要先运行 Django 迁移命令以创建表结构
+  ```bash
+  python manage.py makemigrations
+  python manage.py migrate
+  ```
 
-#### 3. 交易与记录模块
-包含与药品交易和用药记录相关的表：
-- `purchase`（进货记录）
-- `sale`（销售记录）
-- `prescription`（用药记录）
+- 然后运行以下命令导入测试数据：
+  ```bash
+  python manage.py populate_test_data
+  ```
 
-**理由**：这些表记录药品的采购、销售和处方使用，适合交易和监管场景。
+## 项目运行步骤与使用方法
 
-#### 操作步骤
-1. **逻辑分组**：
-   - 在代码或文档中明确上述分组，更新数据库设计文档。
-   - 例如，Django 模型可按模块组织在不同文件中，如 `supply/models.py`、`hospital/models.py`、`transaction/models.py`。
+按照以下步骤在本地运行项目：
 
-2. **视图调整**：
-   - 确保视图（如 `v_total_inventory`、`v_hospital_purchase_total`）按模块引用对应表。
-   - 如 `v_total_inventory` 属于供应链模块，`v_hospital_purchase_total` 涉及交易模块。
+1. **克隆仓库**（如果使用 Git）：
+   ```bash
+   git clone https://github.com/spoil-ed/yyzdt.git
+   cd meme
+   ```
 
-3. **权限分配**：
-   - 为每个模块设置不同权限。例如：
-     - 供应链模块：只允许药企和库存管理员访问。
-     - 医院管理模块：医院管理员和医生访问。
-     - 交易模块：药品管理员和监管机构访问。
-   - 在 Django 中通过 `auth_permission` 或自定义权限类实现。
+2. **激活虚拟环境**：
+   ```bash
+   conda activate db
+   ```
 
-4. **数据库分区（可选）**：
-   - 若数据量大，可将不同模块的表存储在不同数据库实例或 schema 中，使用 Django 的多数据库配置（`settings.DATABASES`）。
+3. **安装 Python 依赖**：
+   - 使用提供的 `requirements.txt`：
+     ```bash
+     pip install -r requirements.txt
+     ```
 
-```
-Yao-Duo-Duo/
-├── database/
-│   ├── urls.py
-│   ├── settings.py
-├── core/
-│   ├── templates/core/
-│   │   ├── login.html
-│   │   ├── register.html
-│   │   ├── dashboard.html
-│   ├── static/ (可能为空)
-│   ├── views.py
-│   ├── urls.py
-│   ├── models.py (可能为空，使用 auth.User)
-├── hospital/
-│   ├── templates/hospital/ (可能包含 doctor_list.html 等)
-│   ├── static/
-│   ├── views.py
-│   ├── urls.py
-│   ├── models.py (可能包含 Doctor, Hospital, Patient)
-├── supply/
-│   ├── templates/supply/ (可能包含 pharma_list.html 等)
-│   ├── static/
-│   ├── views.py
-│   ├── urls.py
-│   ├── models.py (可能包含 Pharmacy, Drug, Inventory)
-├── transaction/
-│   ├── templates/transaction/ (可能包含 purchase_list.html 等)
-│   ├── static/
-│   ├── views.py
-│   ├── urls.py
-│   ├── models.py (可能包含 Purchase, Sale, Prescription)
-├── templates/ (项目级模板，可能包含 login.html 等)
-├── static/ (项目级静态文件)
-```
+4. **启动 Django 开发服务器**：
+   ```bash
+   python manage.py runserver
+   ```
+
+5. **访问应用程序**：
+   - 打开浏览器，访问 `http://localhost:8000`。
+   - 登录页面：`http://localhost:8000/login/`。
+   - 采用账号密码 admin/testpassword123 登录。
+   - 其他账号随机生成，由用户管理页面得到账号，密码皆为 testpassword123。
+## 小组成员
+
+项目由以下团队成员开发：
+
+- **余星磊** 项目构建、前后端代码编写、期末展示准备、辅助编写期末报告
+- **黄亦绪** 项目构建、前后端代码编写、期末展示准备、辅助编写期末报告
+- **金力铖** 期中期末汇报材料准备、期末报告主要内容编写
+- **金潇睿** 期中期末汇报材料准备、辅助编写期末报告

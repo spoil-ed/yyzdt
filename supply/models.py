@@ -1,31 +1,13 @@
 from django.db import models
-from datetime import date, timedelta
+from datetime import date
 from django.utils.translation import gettext_lazy as _
-from hospital.models import City, Hospital, Doctor, Patient, DrugAdmin, DoctorHospital
+from hospital.models import Hospital
 from transaction.models import Purchase, Sale, Prescription
 from django.db import models
 from django.db.models import Sum, F
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
-
-class PharmaGrade(models.Model):
-    name = models.CharField(max_length=50)
-
-    def __str__(self):
-        return self.name
-
-class PharmaType(models.Model):
-    name = models.CharField(max_length=50)
-
-    def __str__(self):
-        return self.name
-
-class City(models.Model):
-    name = models.CharField(max_length=100)
-
-    def __str__(self):
-        return self.name
 
 # 药品供应链模块
 
@@ -131,7 +113,6 @@ class Supply(models.Model):
     def __str__(self):
         return f"{self.batch_code} - {self.drug.name}"
 
-
 class Inventory(models.Model):
     hospital = models.ForeignKey(
         'hospital.Hospital',
@@ -154,6 +135,7 @@ class Inventory(models.Model):
         db_table = 'supply_inventory'  # 修改表名避免冲突
         verbose_name = '库存'
         verbose_name_plural = '库存'
+        unique_together = ('hospital', 'drug')
 
     def __str__(self):
         return f"{self.drug.name} - {self.current_quantity}"
@@ -229,21 +211,38 @@ def create_inventory_for_new_hospital(sender, instance, created, **kwargs):
 # 当创建采购记录时，增加对应药品的库存
 @receiver(post_save, sender=Purchase)
 def increase_inventory_on_purchase(sender, instance, created, **kwargs):
-    if created:
+    # 判断是否为新增记录且状态为已入库，或者记录被更新且状态变为已入库
+    if (created and instance.status == '已入库') or (not created and instance.tracker.has_changed('status')):
         # 获取或创建库存记录
-        print(instance.drug, instance.hospital)
         inventory, _ = Inventory.objects.get_or_create(
             drug=instance.drug,
-            hospital=instance.hospital,  # 假设Purchase模型有hospital字段
+            hospital=instance.hospital,
             defaults={
                 'warning_threshold': 100,
-                'current_quantity': 0  # 采购时库存为0
+                'current_quantity': 0
             }
         )
-        print(inventory)
-        # 增加库存数量
-        inventory.current_quantity = F('current_quantity') + instance.quantity
-        inventory.save()
+        if not created and instance.tracker.has_changed('status'):
+            if instance.status == '已入库':
+                # 增加库存
+                inventory.current_quantity = F('current_quantity') + instance.quantity
+                inventory.save()
+            elif instance.status != "已入库" and instance.tracker.previous('status') == '已入库':
+                # 减少库存
+                print("Decreasing inventory for drug:")
+                if inventory.current_quantity - instance.quantity < 0:
+                    if not created:
+                        instance.status = instance.tracker.previous('status')
+                        instance.save()
+                    # 返回错误信息
+                    raise ValueError('库存不足，无法执行此操作')
+                inventory.current_quantity = F('current_quantity') - instance.quantity
+                inventory.save()
+            
+        elif created and instance.status == '已入库':
+            # 增加库存
+            inventory.current_quantity = F('current_quantity') + instance.quantity
+            inventory.save()
 
 # 当删除采购记录时，减少对应药品的库存
 @receiver(post_delete, sender=Purchase)
@@ -253,8 +252,13 @@ def decrease_inventory_on_purchase_delete(sender, instance, **kwargs):
             drug=instance.drug,
             hospital=instance.hospital  # 假设Purchase模型有hospital字段
         )
-        
+        print("Decreasing inventory for drug:")
         # 减少库存数量
+        if inventory.current_quantity - instance.quantity < 0:
+            print("Inventory quantity is insufficient for deletion.")
+            instance.status = instance.tracker.previous('status')
+            # 返回错误信息
+            raise ValueError('库存不足，无法执行此操作')
         inventory.current_quantity = F('current_quantity') - instance.quantity
         inventory.save()
     except Inventory.DoesNotExist:
@@ -263,15 +267,21 @@ def decrease_inventory_on_purchase_delete(sender, instance, **kwargs):
 # 当创建销售记录时，减少对应药品的库存
 @receiver(post_save, sender=Sale)
 def decrease_inventory_on_sale(sender, instance, created, **kwargs):
-    if created:
+    # 判断是否为新增记录且状态为已取药，或者记录被更新且状态变为已取药
+    if (created and instance.status == '已取药') or (not created and instance.tracker.has_changed('status') and instance.status == '已取药'):
         # 获取或创建库存记录
         inventory, _ = Inventory.objects.get_or_create(
             drug=instance.drug,
-            hospital=instance.hospital,  # 假设Sale模型有hospital字段
+            hospital=instance.hospital,
             defaults={'warning_threshold': 100}
         )
-        
         # 减少库存数量
+        if inventory.current_quantity - instance.quantity < 0:
+            if not created:
+                instance.status = instance.tracker.previous('status')
+                instance.save()
+            # 返回错误信息
+            raise ValueError('库存不足，无法执行此操作')
         inventory.current_quantity = F('current_quantity') - instance.quantity
         inventory.save()
 
